@@ -124,7 +124,8 @@ namespace BatteryBud
       if (_percentagePrev != _percentageCurrent)
       {
         //Updating icon.
-        _trayIcon.Icon?.Dispose( );
+        if (_trayIcon.Icon!=null)
+        {_trayIcon.Icon.Dispose();}
 
         Image image = RenderIcon(_percentageCurrent);
         _trayIcon.Icon = ToIcon(image);
