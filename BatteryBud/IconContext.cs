@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using System.Collections.Generic;
 
 namespace BatteryBud
 {
@@ -14,7 +15,7 @@ namespace BatteryBud
   {
     private const int UPDATE_INTERVAL = 1000; //ms
 
-    private readonly int[ ] _digitSep = new int[10];
+    private readonly int[] _digitSep = new int[10];
 
     private readonly MenuItem _itemAdd;
 
@@ -24,14 +25,11 @@ namespace BatteryBud
     private readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
                                             "\\Battery Bud\\save.sav";
 
-    private readonly Timer _timer = new Timer( );
+    private readonly string _resDir="res\\";
 
-    private readonly NotifyIcon _trayIcon = new NotifyIcon( );
+    private readonly Timer _timer = new Timer();
 
-/*
-    private string _autostartLinkLocation = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-                                            "\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\BatteryBud.lnk";
-*/
+    private readonly NotifyIcon _trayIcon = new NotifyIcon();
 
     private Image _digits;
 
@@ -44,14 +42,15 @@ namespace BatteryBud
     /// <summary>
     ///   Initializing stuff
     /// </summary>
-    public IconContext( )
+    public IconContext()
     {
       if (_pow.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
-      {
-        ShowNoBatteryError( );
+      { 
+        // If a user tries to run program from computer with no battery to track... this is stupid. And sad.
+        ShowError("You're trying to run Battery Bud from desktop PC. What were you thinking? :|","wut");
         return;
       }
-      InitDigits( );
+      InitDigits("digits");
 
       UpdateBattery(null, null);
 
@@ -59,22 +58,22 @@ namespace BatteryBud
       _itemAdd = new MenuItem("Add to autostart.", SetAutostart);
       _itemRemove = new MenuItem("Remove from autostart.", ResetAutostart);
 
-      MenuItem[ ] autostart = { _itemAdd, _itemRemove };
+      MenuItem[] autostart = { _itemAdd, _itemRemove };
 
-      _trayIcon.ContextMenu = new ContextMenu(new[ ]
+      _trayIcon.ContextMenu = new ContextMenu(new[]
       {
         new MenuItem("About", About),
         new MenuItem("Autostart", autostart),
+        new MenuItem("Skins", ContextMenuGetFromResFolder()),
         new MenuItem("Close", Close)
       });
-
       _trayIcon.Visible = true;
 
       // Loading autostart info.
       try
       {
         FileStream file = File.OpenRead(_saveFileName);
-        char autostartEnabled = (char) file.ReadByte( );
+        char autostartEnabled = (char) file.ReadByte();
         file.Close( );
         if (autostartEnabled == '1')
         {
@@ -103,12 +102,11 @@ namespace BatteryBud
     }
 
 
-    public void ShowNoBatteryError( )
+    public void ShowError(string str, string header)
     {
-      // If a user tries to run program from computer with no battery to track... this is stupid. And sad.
-      MessageBox.Show("You're trying to run Battery Bud from desktop PC. What were you thinking? :|", "wut",
-        MessageBoxButtons.OK, MessageBoxIcon.Error);
-      Application.ExitThread( );
+      MessageBox.Show(str, header,
+                       MessageBoxButtons.OK, MessageBoxIcon.Error);
+      Application.ExitThread();
       Environment.Exit(1);
     }
 
@@ -225,6 +223,36 @@ namespace BatteryBud
     }
 
     /// <summary>
+    ///   Scans resource directory for png files and generates 
+    ///   array of MenuItems with filenames witout extension.
+    /// </summary>
+    private MenuItem[] ContextMenuGetFromResFolder()
+    {
+      string[] skins = Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory + _resDir, "*.png", System.IO.SearchOption.TopDirectoryOnly);
+      List<MenuItem> skinItems = new List<MenuItem>();
+      
+      int resDirPathL=AppDomain.CurrentDomain.BaseDirectory.Length + _resDir.Length;
+
+      for(int i=0; i<skins.Length; i+=1)
+      {skinItems.Add(new MenuItem(skins[i].Substring(resDirPathL, skins[i].Length - resDirPathL - 4),SetSkin));} //4 is length of ".png" string.
+
+      return skinItems.ToArray();
+      
+    }
+
+    /// <summary>
+    ///   Sets new skin from file, if it exists.
+    /// </summary>
+    /// <param name="sender">Sender of the event</param>
+    /// <param name="args">Event arguments</param>
+    private void SetSkin(object sender, EventArgs args)
+    {
+      InitDigits(((MenuItem)sender).Text);
+      _percentagePrev = -1;
+      UpdateBattery(null, null);
+    }
+
+    /// <summary>
     ///   Renders icon using loaded font.
     ///   Render works from right to left.
     /// </summary>
@@ -258,15 +286,15 @@ namespace BatteryBud
     /// <summary>
     ///   Loads font file and measures digit's width
     /// </summary>
-    public void InitDigits( )
+    public void InitDigits(string fontName)
     {
       try
       {
-        _digits = Image.FromFile(AppDomain.CurrentDomain.BaseDirectory + "res\\digits.png");
+        _digits = Image.FromFile(AppDomain.CurrentDomain.BaseDirectory + _resDir + fontName + ".png");
       }
       catch (FileNotFoundException)
       {
-        ShowNoBatteryError( );
+        ShowError("No font file!",":c");
         return;
       }
 
@@ -303,10 +331,10 @@ namespace BatteryBud
       }
       catch (ArgumentOutOfRangeException) // For retards who will try to give microscopic images to the program.
       {
-        ShowNoBatteryError( );
+        ShowError("Image is too small to be a font.",":c");
       }
 
-      imgBuf.Dispose( );
+      imgBuf.Dispose();
     }
 
     /// <summary>
