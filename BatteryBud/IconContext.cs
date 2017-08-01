@@ -15,7 +15,7 @@ namespace BatteryBud
   {
     private const int UPDATE_INTERVAL = 1000; //ms
 
-    private readonly int[] _digitSep = new int[10];
+    private int[] _digitSep = new int[10];
 
     private readonly MenuItem _itemAdd;
 
@@ -39,6 +39,9 @@ namespace BatteryBud
       _percentagePrev = -1,
       _percentageCurrent = -1;
 
+    private char _autostartState;
+    private string _skinName;
+
     /// <summary>
     ///   Initializing stuff
     /// </summary>
@@ -48,12 +51,11 @@ namespace BatteryBud
       { 
         // If a user tries to run program from computer with no battery to track... this is stupid. And sad.
         ShowError("You're trying to run Battery Bud from desktop PC. What were you thinking? :|","wut");
-        return;
+        Application.ExitThread();
+        Environment.Exit(1);
       }
-      InitDigits("digits");
-
-      UpdateBattery(null, null);
-
+      
+      
       // Context menu.
       _itemAdd = new MenuItem("Add to autostart.", SetAutostart);
       _itemRemove = new MenuItem("Remove from autostart.", ResetAutostart);
@@ -69,31 +71,33 @@ namespace BatteryBud
       });
       _trayIcon.Visible = true;
 
-      // Loading autostart info.
+      // Loading save info.
       try
       {
-        FileStream file = File.OpenRead(_saveFileName);
-        char autostartEnabled = (char) file.ReadByte();
-        file.Close( );
-        if (autostartEnabled == '1')
-        {
-          SetAutostart(null, null);
-        }
+        Load();
+
+        if (_autostartState == '1')
+        {SetAutostart(null, null);}
         else
-        {
-          ResetAutostart(null, null);
-        }
+        {ResetAutostart(null, null);}
       }
       catch (FileNotFoundException) // Happens when some idiot deletes save file.
-      {
-        SetAutostart(null, null);
-      }
+      {SetAutostart(null, null);}
       catch (DirectoryNotFoundException) // Happens on first launch. 
       {
         Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
                                   "\\Battery Bud");
         SetAutostart(null, null);
       }
+      // Loading save info.
+
+      if (!InitDigits(_skinName)) // If something failed, abort.
+      {
+        Application.ExitThread();
+        Environment.Exit(1);
+      }
+
+      UpdateBattery(null, null);
 
       // Timer
       _timer.Interval = UPDATE_INTERVAL;
@@ -102,13 +106,14 @@ namespace BatteryBud
     }
 
 
+
     public void ShowError(string str, string header)
     {
       MessageBox.Show(str, header,
                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-      Application.ExitThread();
-      Environment.Exit(1);
     }
+
+
 
     /// <summary>
     ///   Main update event handler
@@ -133,6 +138,8 @@ namespace BatteryBud
       _percentagePrev = _percentageCurrent;
     }
 
+
+
     /// <summary>
     ///   About onClick handler
     /// </summary>
@@ -145,12 +152,16 @@ namespace BatteryBud
                       + "\nContact: foxoftgames@gmail.com", "About");
     }
 
+
+
     private void Close(object sender, EventArgs e)
     {
       _trayIcon.Visible = false;
       Application.ExitThread( );
       Application.Exit( );
     }
+
+
 
     /// <summary>
     ///   Checks registry. If there's no autostart key or it's defferent, sets it to proper value.
@@ -172,21 +183,20 @@ namespace BatteryBud
         if (regVal == null || !Application.ExecutablePath.Equals(regVal, StringComparison.OrdinalIgnoreCase))
         {
           try
-          {
-            rkApp.SetValue("BatteryBud", Application.ExecutablePath);
-          }
+          {rkApp.SetValue("BatteryBud", Application.ExecutablePath);}
           catch (Exception)
           {
             // ignored
           }
         }
-        rkApp.Close( );
+        rkApp.Close();
       }
 
-      FileStream file = File.OpenWrite(_saveFileName);
-      file.WriteByte((byte) '1');
-      file.Close( );
+      _autostartState='1';
+      Save();
     }
+
+
 
     /// <summary>
     ///   Deletes registry key and writes 0 to savefile
@@ -206,21 +216,20 @@ namespace BatteryBud
         if (rkApp.GetValue("BatteryBud") != null)
         {
           try
-          {
-            rkApp.DeleteValue("BatteryBud");
-          }
+          {rkApp.DeleteValue("BatteryBud");}
           catch (Exception)
           {
             // ignored
           }
         }
-        rkApp.Close( );
+        rkApp.Close();
       }
 
-      FileStream file = File.OpenWrite(_saveFileName);
-      file.WriteByte((byte) '0');
-      file.Close( );
+      _autostartState='0';
+      Save();
     }
+
+
 
     /// <summary>
     ///   Scans resource directory for png files and generates 
@@ -240,6 +249,8 @@ namespace BatteryBud
       
     }
 
+
+
     /// <summary>
     ///   Sets new skin from file, if it exists.
     /// </summary>
@@ -247,10 +258,19 @@ namespace BatteryBud
     /// <param name="args">Event arguments</param>
     private void SetSkin(object sender, EventArgs args)
     {
-      InitDigits(((MenuItem)sender).Text);
-      _percentagePrev = -1;
-      UpdateBattery(null, null);
+      string skinNameBuf = ((MenuItem)sender).Text;
+      
+      if (InitDigits(skinNameBuf))
+      {
+        _skinName = skinNameBuf;
+        
+        _percentagePrev = -1;
+        UpdateBattery(null, null);
+        Save();    
+      }
     }
+
+
 
     /// <summary>
     ///   Renders icon using loaded font.
@@ -283,25 +303,29 @@ namespace BatteryBud
       return image;
     }
 
+
+
     /// <summary>
     ///   Loads font file and measures digit's width
     /// </summary>
-    public void InitDigits(string fontName)
+    public bool InitDigits(string fontName)
     {
       try
-      {
-        _digits = Image.FromFile(AppDomain.CurrentDomain.BaseDirectory + _resDir + fontName + ".png");
-      }
+      {_digits = Image.FromFile(AppDomain.CurrentDomain.BaseDirectory + _resDir + fontName + ".png");}
       catch (FileNotFoundException)
       {
         ShowError("No font file!",":c");
-        return;
+        return false;
       }
 
-      _digitWidth = (int) Math.Round(_digits.Width / 10f);
+      _digitWidth = (int)Math.Round(_digits.Width / 10f);
+
+
 
       // Measuring each digit width.
       Bitmap imgBuf = new Bitmap(_digits);
+      int[] digitSepBuf = new int[10];
+      
       try
       {
         for (int i = 0; i < 10; i += 1)
@@ -313,28 +337,53 @@ namespace BatteryBud
             for (int y = 0; y < _digits.Height; y += 1)
             {
               if (imgBuf.GetPixel(baseX + x, y).A == 0)
-              {
-                continue;
-              }
+              {continue;}
+
               found = true;
               break;
             }
 
             if (!found)
-            {
-              continue;
-            }
-            _digitSep[i] = x;
+            {continue;}
+            
+            digitSepBuf[i] = x;
             break;
           }
         }
+
+        digitSepBuf.CopyTo(_digitSep,0);
       }
       catch (ArgumentOutOfRangeException) // For retards who will try to give microscopic images to the program.
       {
         ShowError("Image is too small to be a font.",":c");
+        return false;
       }
 
       imgBuf.Dispose();
+
+      return true;
+    }
+
+
+    private void Load()
+    {
+      string[] lines=File.ReadAllLines(_saveFileName);
+      try
+      {
+        _autostartState = lines[0][0];
+        _skinName = lines[1];
+      }
+      catch(IndexOutOfRangeException)
+      {
+        _autostartState = '1';
+        _skinName = "digits";
+      }
+    }
+
+    private void Save()
+    {
+      string buf = _autostartState + Environment.NewLine + _skinName;
+      File.WriteAllText(_saveFileName, buf, System.Text.Encoding.UTF8);
     }
 
     /// <summary>
