@@ -118,7 +118,13 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="BatteryBud.ico" />
-    <Content Include="res\digits.png">
+    <Content Include="res\default16.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="res\default24.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="res\default32.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="res\ENDMYSUFFER.png">

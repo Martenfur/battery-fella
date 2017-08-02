@@ -18,13 +18,12 @@ namespace BatteryBud
     private int[] _digitSep = new int[10];
 
     private readonly MenuItem _itemAdd;
-
     private readonly MenuItem _itemRemove;
+
     private readonly PowerStatus _pow = SystemInformation.PowerStatus;
 
     private readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
                                             "\\Battery Bud\\save.sav";
-
     private readonly string _resDir="res\\";
 
     private readonly Timer _timer = new Timer();
@@ -42,11 +41,14 @@ namespace BatteryBud
     private char _autostartState;
     private string _skinName;
 
+    MenuItem[] _skinContextMenu;
+
     /// <summary>
     ///   Initializing stuff
     /// </summary>
-    public IconContext()
+    public IconContext() 
     {
+      
       if (_pow.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
       { 
         // If a user tries to run program from computer with no battery to track... this is stupid. And sad.
@@ -62,11 +64,13 @@ namespace BatteryBud
 
       MenuItem[] autostart = { _itemAdd, _itemRemove };
 
+      _skinContextMenu = ContextMenuGetFromResFolder();
+
       _trayIcon.ContextMenu = new ContextMenu(new[]
       {
         new MenuItem("About", About),
         new MenuItem("Autostart", autostart),
-        new MenuItem("Skins", ContextMenuGetFromResFolder()),
+        new MenuItem("Skins", _skinContextMenu),
         new MenuItem("Close", Close)
       });
       _trayIcon.Visible = true;
@@ -85,17 +89,30 @@ namespace BatteryBud
       {SetAutostart(null, null);}
       catch (DirectoryNotFoundException) // Happens on first launch. 
       {
+        _skinName=DefaultSkinGet();
         Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
                                   "\\Battery Bud");
         SetAutostart(null, null);
+        ShowGreeting();
       }
       // Loading save info.
 
-      if (!InitDigits(_skinName)) // If something failed, abort.
+      if (!InitSkin(_skinName,true)) // If something failed, abort.
       {
-        Application.ExitThread();
-        Environment.Exit(1);
+        _skinName=DefaultSkinGet();
+        ShowError("Failed to load custom skin. Resetting to default and trying again.",":c");
+
+        if (!InitSkin(_skinName,false)) 
+        {
+          Application.ExitThread();
+          Environment.Exit(1);
+        }
+        else
+        {Save();}
       }
+      
+      for(int i=0; i<_skinContextMenu.Length; i+=1)
+      {_skinContextMenu[i].Checked = _skinContextMenu[i].Text.Equals(_skinName);}
 
       UpdateBattery(null, null);
 
@@ -113,6 +130,13 @@ namespace BatteryBud
                        MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 
+    public void ShowGreeting()
+    {
+      MessageBox.Show("Thanks for using Battery Bud! \\^0^/" + Environment.NewLine +
+                      "Your default font is set to " + _skinName + "." + Environment.NewLine + 
+                      "If it looks blurry or has the same color as background," + Environment.NewLine + 
+                      "you can try out other fonts in context menu. You can also make your own fonts, if you want to.", "Sup.");
+    }
 
 
     /// <summary>
@@ -132,7 +156,7 @@ namespace BatteryBud
 
         Image image = RenderIcon(_percentageCurrent);
         _trayIcon.Icon = ToIcon(image);
-        image.Dispose( );
+        image.Dispose();
       }
 
       _percentagePrev = _percentageCurrent;
@@ -151,8 +175,6 @@ namespace BatteryBud
                       + "Thanks to Konstantin Luzgin and Hans Passant."
                       + "\nContact: foxoftgames@gmail.com", "About");
     }
-
-
 
     private void Close(object sender, EventArgs e)
     {
@@ -260,17 +282,41 @@ namespace BatteryBud
     {
       string skinNameBuf = ((MenuItem)sender).Text;
       
-      if (InitDigits(skinNameBuf))
+      if (InitSkin(skinNameBuf,false))
       {
         _skinName = skinNameBuf;
         
         _percentagePrev = -1;
         UpdateBattery(null, null);
         Save();    
+        
+        for(int i=0; i<_skinContextMenu.Length; i+=1)
+        {_skinContextMenu[i].Checked = false;}
+        ((MenuItem)sender).Checked = true;
       }
     }
 
 
+
+    public string DefaultSkinGet()
+    {
+
+      /*
+      DPI table:
+      100% -  96 dpi - 16 px
+      125% - 120 dpi - 24 px //Yeah, this one is kinda ignored.
+      150% - 144 dpi - 24 px
+      200% - 192 dpi - 32 px
+      */ 
+       
+      Image bmp = new Bitmap(1,1);
+      float dpi = bmp.VerticalResolution;
+      bmp.Dispose();
+      
+      double iconSize = Math.Min(16 + 8*Math.Ceiling((dpi - 96f) / 48f), 32);
+
+      return "default" + iconSize;
+    }
 
     /// <summary>
     ///   Renders icon using loaded font.
@@ -282,8 +328,12 @@ namespace BatteryBud
     {
       int number = numberToRender;
 
-      int x = 16;
-      Image image = new Bitmap(16, 16);
+      int size = (int)Math.Ceiling(((double)_digits.Height)/8.0)*8;
+      int x = size;
+
+      Bitmap bmp = new Bitmap(size, size);
+      bmp.SetResolution(_digits.HorizontalResolution, _digits.VerticalResolution);
+      Image image = bmp;
 
       using (Graphics surf = Graphics.FromImage(image))
       {
@@ -294,10 +344,9 @@ namespace BatteryBud
 
           int xadd = _digitWidth - _digitSep[digit];
           x -= xadd;
-
           surf.DrawImage(_digits, x, 0,
-            new Rectangle(digit * _digitWidth + _digitSep[digit], 0, xadd, 16),
-            GraphicsUnit.Pixel); //Some sick math here. : - )
+                         new Rectangle(digit * _digitWidth + _digitSep[digit], 0, xadd, size),
+                         GraphicsUnit.Pixel); //Some sick math here. : - )
         }
       }
       return image;
@@ -308,13 +357,18 @@ namespace BatteryBud
     /// <summary>
     ///   Loads font file and measures digit's width
     /// </summary>
-    public bool InitDigits(string fontName)
+    /// <param name="fontName">Name of the font, without extension and full path.</param>
+    /// <param name="silent">If true, runs function silently, without error messages.</param>
+    /// <returns>true, if load was successful.</returns>
+    
+    public bool InitSkin(string fontName,bool silent)
     {
       try
       {_digits = Image.FromFile(AppDomain.CurrentDomain.BaseDirectory + _resDir + fontName + ".png");}
       catch (FileNotFoundException)
       {
-        ShowError("No font file!",":c");
+        if (!silent)
+        {ShowError("No font file!",":c");}
         return false;
       }
 
@@ -355,7 +409,8 @@ namespace BatteryBud
       }
       catch (ArgumentOutOfRangeException) // For retards who will try to give microscopic images to the program.
       {
-        ShowError("Image is too small to be a font.",":c");
+        if (!silent)
+        {ShowError("Image is too small to be a font.",":c");}
         return false;
       }
 
@@ -373,10 +428,11 @@ namespace BatteryBud
         _autostartState = lines[0][0];
         _skinName = lines[1];
       }
-      catch(IndexOutOfRangeException)
+      catch(IndexOutOfRangeException) //Support for older save files.
       {
         _autostartState = '1';
-        _skinName = "digits";
+        _skinName = DefaultSkinGet();
+        Save();
       }
     }
 
