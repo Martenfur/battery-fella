@@ -57,7 +57,6 @@ namespace BatteryBud
         Environment.Exit(1);
       }
       
-      
       // Context menu.
       _itemAdd = new MenuItem("Add to autostart.", SetAutostart);
       _itemRemove = new MenuItem("Remove from autostart.", ResetAutostart);
@@ -130,6 +129,8 @@ namespace BatteryBud
                        MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 
+
+
     public void ShowGreeting()
     {
       MessageBox.Show("Thanks for using Battery Bud! \\^0^/" + Environment.NewLine +
@@ -139,13 +140,27 @@ namespace BatteryBud
     }
 
 
+
+
     /// <summary>
-    ///   Main update event handler
+    ///   Main update event handler.
     /// </summary>
-    /// <param name="sender">Sender of the event</param>
-    /// <param name="e">Event arguments</param>
+    /// <param name="sender">Sender of the event.</param>
+    /// <param name="e">Event arguments.</param>
     private void UpdateBattery(object sender, EventArgs e)
     {
+      //Icon caption.
+      if (_pow.BatteryLifeRemaining!=-1)
+      {_trayIcon.Text = "Remaining: " + SecondsToTimeStr(_pow.BatteryLifeRemaining) + ".";}
+      else
+      {
+        if (_pow.PowerLineStatus != 0)
+        {_trayIcon.Text = "Charging." + SecondsToTimeStr(120);}
+        else
+        {_trayIcon.Text = "Calculating remaining time...";}
+      }
+      //Icon caption.
+
       _percentageCurrent = (int) Math.Round(_pow.BatteryLifePercent * 100.0);
 
       if (_percentagePrev != _percentageCurrent)
@@ -165,6 +180,24 @@ namespace BatteryBud
 
 
     /// <summary>
+    ///   Converts given amount of seconds into a string it the format "0h 0m."  
+    /// </summary>
+    /// <param name="seconds">Amount of time.</param>
+    private String SecondsToTimeStr(int seconds)
+    {
+      double minutes=Math.Floor((double)seconds/60);
+      double hours=Math.Floor(minutes/60);
+      minutes-=hours*60;
+
+      if (hours==0)
+      {return minutes + "m";}
+
+      return hours + "h " + minutes + "m";
+    }
+
+
+
+    /// <summary>
     ///   About onClick handler
     /// </summary>
     /// <param name="sender">Sender of the event</param>
@@ -175,6 +208,8 @@ namespace BatteryBud
                       + "Thanks to Konstantin Luzgin and Hans Passant."
                       + "\nContact: foxoftgames@gmail.com", "About");
     }
+
+
 
     private void Close(object sender, EventArgs e)
     {
@@ -318,6 +353,8 @@ namespace BatteryBud
       return "default" + iconSize;
     }
 
+
+
     /// <summary>
     ///   Renders icon using loaded font.
     ///   Render works from right to left.
@@ -360,7 +397,6 @@ namespace BatteryBud
     /// <param name="fontName">Name of the font, without extension and full path.</param>
     /// <param name="silent">If true, runs function silently, without error messages.</param>
     /// <returns>true, if load was successful.</returns>
-    
     public bool InitSkin(string fontName,bool silent)
     {
       try
@@ -420,6 +456,7 @@ namespace BatteryBud
     }
 
 
+
     private void Load()
     {
       string[] lines=File.ReadAllLines(_saveFileName);
@@ -436,17 +473,21 @@ namespace BatteryBud
       }
     }
 
+
+
     private void Save()
     {
       string buf = _autostartState + Environment.NewLine + _skinName;
       File.WriteAllText(_saveFileName, buf, System.Text.Encoding.UTF8);
     }
 
+
+
     /// <summary>
-    ///   * Converts Image to Icon using magic I don't really care about at this point.
-    ///   * Standart conversion messes up with transparency. Not cool, Microsoft, not cool.
-    ///   * Author: Hans Passant
-    ///   * https://stackoverflow.com/questions/21387391/how-to-convert-an-image-to-an-icon-without-losing-transparency
+    ///   Converts Image to Icon using magic I don't really care about at this point.
+    ///   Standart conversion messes up with transparency. Not cool, Microsoft, not cool.
+    ///   Author: Hans Passant
+    ///   https://stackoverflow.com/questions/21387391/how-to-convert-an-image-to-an-icon-without-losing-transparency
     /// </summary>
     /// <param name="image">Image to convert</param>
     /// <returns>Converted icon</returns>
