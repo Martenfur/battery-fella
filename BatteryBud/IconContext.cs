@@ -155,7 +155,7 @@ namespace BatteryBud
       else
       {
         if (_pow.PowerLineStatus != 0)
-        {_trayIcon.Text = "Charging." + SecondsToTimeStr(120);}
+        {_trayIcon.Text = "Charging.";}
         else
         {_trayIcon.Text = "Calculating remaining time...";}
       }
