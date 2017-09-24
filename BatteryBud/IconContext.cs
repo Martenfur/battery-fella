@@ -49,6 +49,7 @@ namespace BatteryBud
     public IconContext() 
     {
       
+      /* Got a report from one user that it doesn't work properly. Disabled for now.
       if (_pow.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
       { 
         // If a user tries to run program from computer with no battery to track... this is stupid. And sad.
@@ -56,7 +57,8 @@ namespace BatteryBud
         Application.ExitThread();
         Environment.Exit(1);
       }
-      
+      */
+       
       // Context menu.
       _itemAdd = new MenuItem("Add to autostart.", SetAutostart);
       _itemRemove = new MenuItem("Remove from autostart.", ResetAutostart);
