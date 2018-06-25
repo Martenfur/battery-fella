@@ -62,7 +62,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IconContext.cs" />
+    <Compile Include="MainController.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
@@ -118,16 +118,16 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="BatteryBud.ico" />
-    <Content Include="res\default16.png">
+    <Content Include="Resources\default16.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="res\default24.png">
+    <Content Include="Resources\default24.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="res\default32.png">
+    <Content Include="Resources\default32.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="res\ENDMYSUFFER.png">
+    <Content Include="Resources\ENDMYSUFFER.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

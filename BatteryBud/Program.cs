@@ -12,8 +12,10 @@ namespace BatteryBud
     {
       // ReSharper disable once UnusedVariable
       if (Environment.OSVersion.Version.Major >= 6) // Makes context menus look fabulous on any DPI.
-      {SetProcessDPIAware();}
-      IconContext iconContext = new IconContext();
+      {
+				SetProcessDPIAware();
+			}
+      new MainController();
       Application.Run();
     }
 
