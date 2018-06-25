@@ -1,11 +1,14 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
+﻿using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
-using Microsoft.Win32;
-using System.Collections.Generic;
+using System.Media;
+using System.Diagnostics;
+using NAudio.Wave;
+
 
 namespace BatteryBud
 {
@@ -22,7 +25,7 @@ namespace BatteryBud
 
 		private readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
 			"\\Battery Bud\\save.sav";
-		private readonly string _resourceDir="Resources\\";
+		private readonly string _resourceDir = "Resources\\";
 
 		private readonly string _registryPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 
@@ -40,12 +43,13 @@ namespace BatteryBud
 
 		MenuItem[] _skinContextMenu;
 
+		private SoundPlayer _player;
+
 		/// <summary>
 		/// Initializing stuff.
 		/// </summary>
 		public MainController() 
 		{
-			
 			/* Got a report from one user that it doesn't work properly. Disabled for now.
 			if (_pow.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
 			{ 
@@ -60,7 +64,7 @@ namespace BatteryBud
 			_itemAdd = new MenuItem("Add to autostart.", SetAutostart);
 			_itemRemove = new MenuItem("Remove from autostart.", ResetAutostart);
 
-			MenuItem[] autostart = { _itemAdd, _itemRemove };
+			MenuItem[] autostart = {_itemAdd, _itemRemove};
 
 			_skinContextMenu = ContextMenuGetFromResFolder();
 
@@ -95,7 +99,7 @@ namespace BatteryBud
 			}
 			catch(DirectoryNotFoundException) // Happens on first launch. 
 			{
-				_skinName=GetDefaultSkin();
+				_skinName = GetDefaultSkin();
 				Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Battery Bud");
 				SetAutostart(null, null);
 				ShowGreeting();
@@ -104,7 +108,7 @@ namespace BatteryBud
 
 			if (!InitSkin(_skinName, true)) // If something failed, abort.
 			{
-				_skinName=GetDefaultSkin();
+				_skinName = GetDefaultSkin();
 				ShowError("Failed to load custom skin. Resetting to default and trying again.",":c");
 
 				if (!InitSkin(_skinName, false)) 
@@ -118,10 +122,19 @@ namespace BatteryBud
 				}
 			}
 			
-			for(int i=0; i<_skinContextMenu.Length; i+=1)
+			foreach(MenuItem item in _skinContextMenu)
 			{
-				_skinContextMenu[i].Checked = _skinContextMenu[i].Text.Equals(_skinName);
+				item.Checked = item.Text.Equals(_skinName);
 			}
+			
+			WaveStream mainOutputStream = new WaveFileReader(Environment.CurrentDirectory + "\\" + _resourceDir + "low_battery.wav");
+			WaveChannel32 volumeStream = new WaveChannel32(mainOutputStream);
+
+			WaveOutEvent player = new WaveOutEvent();
+
+			player.Init(volumeStream);
+
+			player.Play();
 
 			UpdateBattery(null, null);
 
@@ -162,6 +175,7 @@ namespace BatteryBud
 		/// <param name="e">Event arguments.</param>
 		private void UpdateBattery(object sender, EventArgs e)
 		{
+			//_player.PlaySync();
 			//Icon caption.
 			if (_pow.BatteryLifeRemaining!=-1)
 			{
