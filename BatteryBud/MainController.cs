@@ -33,14 +33,17 @@ namespace BatteryBud
 		int _percentagePrev = -1;
 		int _percentageCurrent = -1;
 
-		char _autostartState;
+		bool _autostartEnabled;
 		string _skinName;
 		
 		WaveStream _waveStream;
 		WaveOutEvent _soundPlayer;
-		int _reminderTriggerValue = 50;
+		int _reminderTriggerValue = 100;
 		int _reminderDefaultTriggerValue = 7;
 
+		
+		bool _reminderEnabled = true;
+		bool _reminderDisabledUntilShutdown = false;
 
 		MenuItem[] _skinContextMenu;
 		MenuItem _itemAdd;
@@ -70,7 +73,7 @@ namespace BatteryBud
 			{
 				Load();
 
-				if (_autostartState == '1')
+				if (_autostartEnabled)
 				{
 					SetAutostart(null, null);
 				}
@@ -127,6 +130,7 @@ namespace BatteryBud
 		}
 
 
+
 		private void InitContextMenu()
 		{
 			// Reminder.
@@ -139,11 +143,12 @@ namespace BatteryBud
 			
 			var reminderMenu = new MenuItem[]
 			{
-				new MenuItem("Disable"),
-				new MenuItem("Disable until shutdown"),
+				new MenuItem("Enable", ReminderToggle),
+				new MenuItem("Disable until shutdown", DisableReminderUntilShutdownToggle),
 				new MenuItem("Ring when battery is lower than", reminderItems),
-				new MenuItem("OwO what's this?"),
+				new MenuItem("OwO what's this?", ShowReminderHelp),
 			};
+			reminderMenu[0].Checked = _reminderEnabled;
 			// Reminder.
 
 
@@ -159,7 +164,7 @@ namespace BatteryBud
 			_trayIcon.ContextMenu = new ContextMenu(
 				new []
 				{
-					new MenuItem("About", About),
+					new MenuItem("About", ShowAbout),
 					new MenuItem("Autostart", new []{_itemAdd, _itemRemove}),
 					new MenuItem("Skins", _skinContextMenu),
 					new MenuItem("Reminder", reminderMenu),
@@ -169,9 +174,10 @@ namespace BatteryBud
 
 
 			
-			_itemAdd.Checked = (_autostartState == '1');
+			_itemAdd.Checked = _autostartEnabled;
 			_itemRemove.Checked = !_itemAdd.Checked;
 		}
+
 
 
 		/// <summary>
@@ -181,8 +187,6 @@ namespace BatteryBud
 		/// <param name="e">Event arguments.</param>
 		private void UpdateBattery(object sender, EventArgs e)
 		{
-			
-
 			//Icon caption.
 			if (_pow.BatteryLifeRemaining != -1)
 			{
@@ -220,11 +224,17 @@ namespace BatteryBud
 
 			_percentagePrev = _percentageCurrent;
 
-			if (_percentageCurrent <= _reminderTriggerValue && _pow.PowerLineStatus == 0)
+			// Playing reminder sound.
+			if (_reminderEnabled
+				&& !_reminderDisabledUntilShutdown
+				&& _percentageCurrent <= _reminderTriggerValue 
+				&& _pow.PowerLineStatus == 0
+			)
 			{
 				_waveStream.Seek(0, SeekOrigin.Begin);
 				_soundPlayer.Play();
 			}
+			// Playing reminder sound.
 		}
 
 
@@ -275,7 +285,7 @@ namespace BatteryBud
 				regKey.Close();
 			}
 
-			_autostartState = '1';
+			_autostartEnabled = true;
 			Save();
 		}
 
@@ -309,7 +319,7 @@ namespace BatteryBud
 				regKey.Close();
 			}
 
-			_autostartState = '0';
+			_autostartEnabled = false;
 			Save();
 		}
 
@@ -467,19 +477,49 @@ namespace BatteryBud
 
 
 
+		#region Reminder.
+		
+		private void ReminderToggle(object sender, EventArgs e)
+		{
+			var item = ((MenuItem)sender);
+			
+			_reminderEnabled = !item.Checked;
+			item.Checked = !item.Checked;
+
+			Save();
+		}
+
+
+
+		private void DisableReminderUntilShutdownToggle(object sender, EventArgs e)
+		{
+			var item = ((MenuItem)sender);
+			
+			_reminderDisabledUntilShutdown = !item.Checked;
+			item.Checked = !item.Checked;
+		}
+
+
+
+		#endregion Reminder.
+
+
+
 		#region Saves handling.
+
+		//TODO: Add reminder data handling, migrate to JSON.
 
 		private void Load()
 		{
 			var lines = File.ReadAllLines(_saveFileName);
 			try
 			{
-				_autostartState = lines[0][0];
+				_autostartEnabled = (lines[0][0] == '1');
 				_skinName = lines[1];
 			}
 			catch(IndexOutOfRangeException) //Support for older save files.
 			{
-				_autostartState = '1';
+				_autostartEnabled = true;
 				_skinName = GetDefaultSkin();
 				Save();
 			}
@@ -489,7 +529,13 @@ namespace BatteryBud
 
 		private void Save()
 		{
-			string buf = _autostartState + Environment.NewLine + _skinName;
+			var autostartChar = '0';
+			if (_autostartEnabled)
+			{
+				autostartChar = '1';
+			}
+			
+			string buf = autostartChar + Environment.NewLine + _skinName;
 			File.WriteAllText(_saveFileName, buf, System.Text.Encoding.UTF8);
 		}
 
@@ -593,10 +639,8 @@ namespace BatteryBud
 
 		#region Messages.
 
-		public void ShowError(string str, string header)
-		{
+		public void ShowError(string str, string header) =>
 			MessageBox.Show(str, header, MessageBoxButtons.OK, MessageBoxIcon.Error);
-		}
 
 
 
@@ -619,12 +663,33 @@ namespace BatteryBud
 		/// </summary>
 		/// <param name="sender">Sender of the event</param>
 		/// <param name="e">Event arguments</param>
-		private static void About(object sender, EventArgs e)
+		private static void ShowAbout(object sender, EventArgs e)
 		{
 			MessageBox.Show(
 				"Battery Bud v" + Program.Version + " by gn.fur." + Environment.NewLine + 
 				"Thanks to Konstantin Luzgin and Hans Passant." + 
-				"\nContact: foxoftgames@gmail.com", "About"
+				"\nContact: foxoftgames@gmail.com", 
+				
+				"About"
+			);
+		}
+
+
+
+		/// <summary>
+		/// About onClick handler.
+		/// </summary>
+		/// <param name="sender">Sender of the event</param>
+		/// <param name="e">Event arguments</param>
+		private static void ShowReminderHelp(object sender, EventArgs e)
+		{
+			MessageBox.Show(
+				"You know, it happens sometimes. Windows tells your battery is almost dead, " + 
+				"you click OK and continue to watch that important video, until the laptop " + 
+				"suddenly shuts down. But fear not! Now Battery Bud will ring the alarm when " + 
+				"battery will be lower than certain percentage.", 
+				
+				"Oh no, I forgot to plug in my laptop! Again!"
 			);
 		}
 

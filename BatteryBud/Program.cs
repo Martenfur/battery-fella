@@ -5,7 +5,7 @@ namespace BatteryBud
 {
   internal static class Program
   {
-    public static string Version = "1.1";
+    public static string Version = "1.2";
 
     [STAThread]
     private static void Main()
