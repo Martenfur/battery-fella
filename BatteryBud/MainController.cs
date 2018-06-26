@@ -5,45 +5,47 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
-using System.Media;
 using System.Diagnostics;
 using NAudio.Wave;
-
 
 namespace BatteryBud
 {
 	public class MainController : ApplicationContext
 	{
-		private const int _updateInterval = 1000; //ms
+		const int _updateInterval = 1000; //ms
 
-		private int[] _digitSep = new int[10];
+		int[] _digitSep = new int[10];
 
-		private readonly MenuItem _itemAdd;
-		private readonly MenuItem _itemRemove;
+		
+		readonly PowerStatus _pow = SystemInformation.PowerStatus;
 
-		private readonly PowerStatus _pow = SystemInformation.PowerStatus;
-
-		private readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
+		readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
 			"\\Battery Bud\\save.sav";
-		private readonly string _resourceDir = "Resources\\";
+		readonly string _resourceDir = "Resources\\";
+		readonly string _registryPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 
-		private readonly string _registryPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+		readonly Timer _timer = new Timer();
 
-		private readonly Timer _timer = new Timer();
+		readonly NotifyIcon _trayIcon = new NotifyIcon();
+		Image _digits;
+		int _digitWidth;
 
-		private readonly NotifyIcon _trayIcon = new NotifyIcon();
-		private Image _digits;
-		private int _digitWidth;
+		int _percentagePrev = -1;
+		int _percentageCurrent = -1;
 
-		private int _percentagePrev = -1;
-		private int _percentageCurrent = -1;
+		char _autostartState;
+		string _skinName;
+		
+		WaveStream _waveStream;
+		WaveOutEvent _soundPlayer;
+		int _reminderTriggerValue = 50;
+		int _reminderDefaultTriggerValue = 7;
 
-		private char _autostartState;
-		private string _skinName;
 
 		MenuItem[] _skinContextMenu;
+		MenuItem _itemAdd;
+		MenuItem _itemRemove;
 
-		private SoundPlayer _player;
 
 		/// <summary>
 		/// Initializing stuff.
@@ -59,24 +61,8 @@ namespace BatteryBud
 				Environment.Exit(1);
 			}
 			*/
-			 
-			// Context menu.
-			_itemAdd = new MenuItem("Add to autostart.", SetAutostart);
-			_itemRemove = new MenuItem("Remove from autostart.", ResetAutostart);
-
-			MenuItem[] autostart = {_itemAdd, _itemRemove};
-
-			_skinContextMenu = ContextMenuGetFromResFolder();
-
-			_trayIcon.ContextMenu = new ContextMenu(
-				new []
-				{
-					new MenuItem("About", About),
-					new MenuItem("Autostart", autostart),
-					new MenuItem("Skins", _skinContextMenu),
-					new MenuItem("Close", Close)
-				}
-			);
+			
+			
 			_trayIcon.Visible = true;
 
 			// Loading save info.
@@ -122,50 +108,70 @@ namespace BatteryBud
 				}
 			}
 			
-			foreach(MenuItem item in _skinContextMenu)
-			{
-				item.Checked = item.Text.Equals(_skinName);
-			}
+			InitContextMenu();
+
+
+			_waveStream = new WaveFileReader(Environment.CurrentDirectory + "\\" + _resourceDir + "low_battery.wav");
+			_soundPlayer = new WaveOutEvent();
+			_soundPlayer.Init(_waveStream);
 			
-			WaveStream mainOutputStream = new WaveFileReader(Environment.CurrentDirectory + "\\" + _resourceDir + "low_battery.wav");
-			WaveChannel32 volumeStream = new WaveChannel32(mainOutputStream);
 
-			WaveOutEvent player = new WaveOutEvent();
-
-			player.Init(volumeStream);
-
-			player.Play();
-
+			
 			UpdateBattery(null, null);
 
 			// Timer.
 			_timer.Interval = _updateInterval;
 			_timer.Tick += UpdateBattery;
 			_timer.Enabled = true;
+
 		}
 
 
-
-		public void ShowError(string str, string header)
+		private void InitContextMenu()
 		{
-			MessageBox.Show(str, header, MessageBoxButtons.OK, MessageBoxIcon.Error);
-		}
+			// Reminder.
+			int[] reminderPercents = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75};
+			var reminderItems = new MenuItem[reminderPercents.Length];
+			for(var i = 0; i < reminderItems.Length; i += 1)
+			{
+				reminderItems[i] = new MenuItem(reminderPercents[i] + "%");
+			}
+			
+			var reminderMenu = new MenuItem[]
+			{
+				new MenuItem("Disable"),
+				new MenuItem("Disable until shutdown"),
+				new MenuItem("Ring when battery is lower than", reminderItems),
+				new MenuItem("OwO what's this?"),
+			};
+			// Reminder.
 
 
+			_itemAdd = new MenuItem("Add to autostart", SetAutostart);
+			_itemRemove = new MenuItem("Remove from autostart", ResetAutostart);
+			
+			_skinContextMenu = GetSkinList();
+			foreach(MenuItem item in _skinContextMenu)
+			{
+				item.Checked = (item.Text == _skinName);
+			}
 
-		public void ShowGreeting()
-		{
-			MessageBox.Show(
-				@"Thanks for choosing Battery Bud! \^0^/" + Environment.NewLine +
-				"Your default font is set to " + _skinName + "." + Environment.NewLine + 
-				"If it looks blurry or has the same color as background," + Environment.NewLine + 
-				"you can try out other fonts in context menu. You can also make your own fonts, if you want to.", 
-				
-				"Sup."
+			_trayIcon.ContextMenu = new ContextMenu(
+				new []
+				{
+					new MenuItem("About", About),
+					new MenuItem("Autostart", new []{_itemAdd, _itemRemove}),
+					new MenuItem("Skins", _skinContextMenu),
+					new MenuItem("Reminder", reminderMenu),
+					new MenuItem("Close", Close)
+				}
 			);
+
+
+			
+			_itemAdd.Checked = (_autostartState == '1');
+			_itemRemove.Checked = !_itemAdd.Checked;
 		}
-
-
 
 
 		/// <summary>
@@ -175,11 +181,14 @@ namespace BatteryBud
 		/// <param name="e">Event arguments.</param>
 		private void UpdateBattery(object sender, EventArgs e)
 		{
-			//_player.PlaySync();
+			
+
 			//Icon caption.
-			if (_pow.BatteryLifeRemaining!=-1)
+			if (_pow.BatteryLifeRemaining != -1)
 			{
-				_trayIcon.Text = "Remaining: " + SecondsToTimeStr(_pow.BatteryLifeRemaining) + ".";
+				var timeSpan = TimeSpan.FromSeconds(_pow.BatteryLifeRemaining);
+				var remainingTime = string.Format("{0:D2}h {1:D2}m", timeSpan.Hours, timeSpan.Minutes);
+				_trayIcon.Text = "Remaining: " + remainingTime + ".";
 			}
 			else
 			{
@@ -210,42 +219,12 @@ namespace BatteryBud
 			}
 
 			_percentagePrev = _percentageCurrent;
-		}
 
-
-
-		/// <summary>
-		/// Converts given amount of seconds into a string it the format "0h 0m."  
-		/// </summary>
-		/// <param name="seconds">Amount of time.</param>
-		private String SecondsToTimeStr(int seconds)
-		{
-			double minutes = Math.Floor((double)seconds / 60);
-			double hours = Math.Floor(minutes / 60);
-			minutes -= hours * 60;
-
-			if (hours == 0)
+			if (_percentageCurrent <= _reminderTriggerValue && _pow.PowerLineStatus == 0)
 			{
-				return minutes + "m";
+				_waveStream.Seek(0, SeekOrigin.Begin);
+				_soundPlayer.Play();
 			}
-
-			return hours + "h " + minutes + "m";
-		}
-
-
-
-		/// <summary>
-		///   About onClick handler
-		/// </summary>
-		/// <param name="sender">Sender of the event</param>
-		/// <param name="e">Event arguments</param>
-		private static void About(object sender, EventArgs e)
-		{
-			MessageBox.Show(
-				"Battery Bud v" + Program.Version + " by gn.fur." + Environment.NewLine + 
-				"Thanks to Konstantin Luzgin and Hans Passant." + 
-				"\nContact: foxoftgames@gmail.com", "About"
-			);
 		}
 
 
@@ -253,11 +232,18 @@ namespace BatteryBud
 		private void Close(object sender, EventArgs e)
 		{
 			_trayIcon.Visible = false;
+			_trayIcon.Dispose();
+
 			Application.ExitThread();
 			Application.Exit();
+
+			_waveStream.Close();
+			_soundPlayer.Dispose();
 		}
 
 
+
+		#region Autostart.
 
 		/// <summary>
 		/// Checks registry. If there's no autostart key or it's defferent, sets it to proper value.
@@ -267,8 +253,11 @@ namespace BatteryBud
 		/// <param name="args">Event arguments</param>
 		private void SetAutostart(object sender, EventArgs args)
 		{
-			_itemAdd.Checked = true;
-			_itemRemove.Checked = false;
+			if (_itemAdd != null && _itemRemove != null)
+			{
+				_itemAdd.Checked = true;
+				_itemRemove.Checked = false;
+			}
 
 			RegistryKey regKey = Registry.CurrentUser.OpenSubKey(_registryPath, true);
 			if (regKey != null)
@@ -299,8 +288,11 @@ namespace BatteryBud
 		/// <param name="args">Event arguments</param>
 		private void ResetAutostart(object sender, EventArgs args)
 		{
-			_itemAdd.Checked = false;
-			_itemRemove.Checked = true;
+			if (_itemAdd != null && _itemRemove != null)
+			{
+				_itemAdd.Checked = false;
+				_itemRemove.Checked = true;
+			}
 
 			RegistryKey regKey = Registry.CurrentUser.OpenSubKey(_registryPath, true);
 
@@ -321,116 +313,11 @@ namespace BatteryBud
 			Save();
 		}
 
-
-
-		/// <summary>
-		/// Scans resource directory for png files and generates 
-		/// array of MenuItems with filenames witout extension.
-		/// </summary>
-		private MenuItem[] ContextMenuGetFromResFolder()
-		{
-			var skinItems = new List<MenuItem>();
-			
-			var dirInfo = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory + _resourceDir);
-			foreach(FileInfo file in dirInfo.GetFiles("*.png"))
-			{
-				skinItems.Add(new MenuItem(Path.GetFileNameWithoutExtension(file.Name), SetSkin));
-			}
-
-			return skinItems.ToArray();
-		}
+		#endregion Autostart.
 
 
 
-		/// <summary>
-		/// Sets new skin from file, if it exists.
-		/// </summary>
-		/// <param name="sender">Sender of the event</param>
-		/// <param name="args">Event arguments</param>
-		private void SetSkin(object sender, EventArgs args)
-		{
-			var skinNameBuf = ((MenuItem)sender).Text;
-			
-			if (InitSkin(skinNameBuf, false))
-			{
-				_skinName = skinNameBuf;
-				
-				_percentagePrev = -1;
-				UpdateBattery(null, null);
-				Save();    
-				
-				foreach(MenuItem item in _skinContextMenu)
-				{
-					item.Checked = false;
-				}
-
-				((MenuItem)sender).Checked = true;
-			}
-		}
-
-
-
-		public string GetDefaultSkin()
-		{
-
-			/*
-			DPI table:
-			100% -  96 dpi - 16 px
-			125% - 120 dpi - 24 px //Yeah, this one is kinda ignored.
-			150% - 144 dpi - 24 px
-			200% - 192 dpi - 32 px
-			*/ 
-			 
-			Image bmp = new Bitmap(1,1);
-			float dpi = bmp.VerticalResolution;
-			bmp.Dispose();
-			
-			double iconSize = Math.Min(16 + 8 * Math.Ceiling((dpi - 96f) / 48f), 32);
-
-			return "default" + iconSize;
-		}
-
-
-
-		/// <summary>
-		/// Renders icon using loaded font.
-		/// Render works from right to left.
-		/// </summary>
-		/// <param name="numberToRender">Number to render</param>
-		/// <returns>Rendered icon</returns>
-		public Image RenderIcon(int numberToRender)
-		{
-			var number = numberToRender;
-
-			var size = (int)Math.Ceiling(_digits.Height / 8.0) * 8;
-			var x = size;
-
-			var bmp = new Bitmap(size, size);
-			bmp.SetResolution(_digits.HorizontalResolution, _digits.VerticalResolution);
-			Image image = bmp;
-
-			using(Graphics surf = Graphics.FromImage(image))
-			{
-				while(number != 0)
-				{
-					int digit = number % 10; // Getting last digit.
-					number = (number - digit) / 10;
-
-					int xadd = _digitWidth - _digitSep[digit];
-					x -= xadd;
-					surf.DrawImage(
-						_digits, 
-						x, 
-						0,
-						new Rectangle(digit * _digitWidth + _digitSep[digit], 0, xadd, size),
-						GraphicsUnit.Pixel
-					); //Some sick math here. : - )
-				}
-			}
-			return image;
-		}
-
-
+		#region Skins.
 
 		/// <summary>
 		/// Loads font file and measures digit's width
@@ -438,7 +325,7 @@ namespace BatteryBud
 		/// <param name="fontName">Name of the font, without extension and full path.</param>
 		/// <param name="silent">If true, runs function silently, without error messages.</param>
 		/// <returns>true, if load was successful.</returns>
-		public bool InitSkin(string fontName,bool silent)
+		public bool InitSkin(string fontName, bool silent)
 		{
 			try
 			{
@@ -448,7 +335,7 @@ namespace BatteryBud
 			{
 				if (!silent)
 				{
-					ShowError("No font file!",":c");
+					ShowError("No font file!", ":c");
 				}
 				return false;
 			}
@@ -491,13 +378,13 @@ namespace BatteryBud
 					}
 				}
 
-				digitSepBuf.CopyTo(_digitSep,0);
+				digitSepBuf.CopyTo(_digitSep, 0);
 			}
-			catch(ArgumentOutOfRangeException) // For retards who will try to give microscopic images to the program.
+			catch(ArgumentOutOfRangeException) // For dumbasses who will try to give microscopic images to the program.
 			{
 				if (!silent)
 				{
-					ShowError("Image is too small to be a font.",":c");
+					ShowError("Image is too small to be a font.", ":c");
 				}
 				return false;
 			}
@@ -509,9 +396,82 @@ namespace BatteryBud
 
 
 
+		/// <summary>
+		/// Scans resource directory for png files and generates 
+		/// array of MenuItems with filenames witout extension.
+		/// </summary>
+		private MenuItem[] GetSkinList()
+		{
+			var skinItems = new List<MenuItem>();
+			
+			var dirInfo = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory + _resourceDir);
+			foreach(FileInfo file in dirInfo.GetFiles("*.png"))
+			{
+				skinItems.Add(new MenuItem(Path.GetFileNameWithoutExtension(file.Name), SetSkin));
+			}
+
+			return skinItems.ToArray();
+		}
+
+
+
+		public string GetDefaultSkin()
+		{
+
+			/*
+			DPI table:
+			100% -  96 dpi - 16 px
+			125% - 120 dpi - 24 px // Yeah, this one is kinda ignored.
+			150% - 144 dpi - 24 px
+			200% - 192 dpi - 32 px
+			*/ 
+			 
+			Image bmp = new Bitmap(1, 1);
+			float dpi = bmp.VerticalResolution;
+			bmp.Dispose();
+			
+			double iconSize = Math.Min(16 + 8 * Math.Ceiling((dpi - 96f) / 48f), 32);
+
+			return "default" + iconSize;
+		}
+
+
+
+		/// <summary>
+		/// Sets new skin from file, if it exists.
+		/// </summary>
+		/// <param name="sender">Sender of the event</param>
+		/// <param name="args">Event arguments</param>
+		private void SetSkin(object sender, EventArgs args)
+		{
+			var skinNameBuf = ((MenuItem)sender).Text;
+			
+			if (InitSkin(skinNameBuf, false))
+			{
+				_skinName = skinNameBuf;
+				
+				_percentagePrev = -1;
+				UpdateBattery(null, null);
+				Save();    
+				
+				foreach(MenuItem item in _skinContextMenu)
+				{
+					item.Checked = false;
+				}
+
+				((MenuItem)sender).Checked = true;
+			}
+		}
+
+		#endregion Skins.
+
+
+
+		#region Saves handling.
+
 		private void Load()
 		{
-			string[] lines = File.ReadAllLines(_saveFileName);
+			var lines = File.ReadAllLines(_saveFileName);
 			try
 			{
 				_autostartState = lines[0][0];
@@ -531,6 +491,50 @@ namespace BatteryBud
 		{
 			string buf = _autostartState + Environment.NewLine + _skinName;
 			File.WriteAllText(_saveFileName, buf, System.Text.Encoding.UTF8);
+		}
+
+		#endregion Saves handling.
+
+
+
+		#region Tray icon.
+
+		/// <summary>
+		/// Renders icon using loaded font.
+		/// Render works from right to left.
+		/// </summary>
+		/// <param name="numberToRender">Number to render</param>
+		/// <returns>Rendered icon</returns>
+		public Image RenderIcon(int numberToRender)
+		{
+			var number = numberToRender;
+
+			var size = (int)Math.Ceiling(_digits.Height / 8.0) * 8;
+			var x = size;
+
+			var bmp = new Bitmap(size, size);
+			bmp.SetResolution(_digits.HorizontalResolution, _digits.VerticalResolution);
+			Image image = bmp;
+
+			using(Graphics surf = Graphics.FromImage(image))
+			{
+				while(number != 0)
+				{
+					int digit = number % 10; // Getting last digit.
+					number = (number - digit) / 10;
+
+					int xadd = _digitWidth - _digitSep[digit];
+					x -= xadd;
+					surf.DrawImage(
+						_digits, 
+						x, 
+						0,
+						new Rectangle(digit * _digitWidth + _digitSep[digit], 0, xadd, size),
+						GraphicsUnit.Pixel
+					); //Some sick math here. : - )
+				}
+			}
+			return image;
 		}
 
 
@@ -581,6 +585,50 @@ namespace BatteryBud
 
 			// And load it
 			return new Icon(ms);
+		}	
+
+		#endregion Tray icon.
+
+
+
+		#region Messages.
+
+		public void ShowError(string str, string header)
+		{
+			MessageBox.Show(str, header, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		}
+
+
+
+		public void ShowGreeting()
+		{
+			MessageBox.Show(
+				@"Thanks for choosing Battery Bud! \^0^/" + Environment.NewLine +
+				"Your default font is set to " + _skinName + "." + Environment.NewLine + 
+				"If it looks blurry or has the same color as background," + Environment.NewLine + 
+				"you can try out other fonts in context menu. You can also make your own fonts, if you want to.", 
+				
+				"Sup."
+			);
+		}
+
+
+
+		/// <summary>
+		/// About onClick handler.
+		/// </summary>
+		/// <param name="sender">Sender of the event</param>
+		/// <param name="e">Event arguments</param>
+		private static void About(object sender, EventArgs e)
+		{
+			MessageBox.Show(
+				"Battery Bud v" + Program.Version + " by gn.fur." + Environment.NewLine + 
+				"Thanks to Konstantin Luzgin and Hans Passant." + 
+				"\nContact: foxoftgames@gmail.com", "About"
+			);
+		}
+
+		#endregion Messages.
+
 	}
 }
