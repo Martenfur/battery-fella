@@ -7,6 +7,7 @@ using System.IO;
 using System.Windows.Forms;
 using System.Diagnostics;
 using NAudio.Wave;
+using Newtonsoft.Json.Linq;
 
 namespace BatteryBud
 {
@@ -20,7 +21,7 @@ namespace BatteryBud
 		readonly PowerStatus _pow = SystemInformation.PowerStatus;
 
 		readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-			"\\Battery Bud\\save.sav";
+			"\\Battery Bud\\config.json";
 		readonly string _resourceDir = "Resources\\";
 		readonly string _registryPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 
@@ -38,16 +39,19 @@ namespace BatteryBud
 		
 		WaveStream _waveStream;
 		WaveOutEvent _soundPlayer;
-		int _reminderTriggerValue = 100;
-		int _reminderDefaultTriggerValue = 7;
 
-		
+		int _reminderTriggerValue = 7;
 		bool _reminderEnabled = true;
 		bool _reminderDisabledUntilShutdown = false;
+		bool _reminderDisabledUntilCharging = false;
+		MenuItem[] _reminderPercentItems;
+
+		MenuItem _reminderDisableUntilChargingItem;
 
 		MenuItem[] _skinContextMenu;
 		MenuItem _itemAdd;
 		MenuItem _itemRemove;
+
 
 
 		/// <summary>
@@ -55,7 +59,6 @@ namespace BatteryBud
 		/// </summary>
 		public MainController() 
 		{
-			/* Got a report from one user that it doesn't work properly. Disabled for now.
 			if (_pow.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
 			{ 
 				// If a user tries to run program from computer with no battery to track... this is stupid. And sad.
@@ -63,8 +66,6 @@ namespace BatteryBud
 				Application.ExitThread();
 				Environment.Exit(1);
 			}
-			*/
-			
 			
 			_trayIcon.Visible = true;
 
@@ -118,8 +119,6 @@ namespace BatteryBud
 			_soundPlayer = new WaveOutEvent();
 			_soundPlayer.Init(_waveStream);
 			
-
-			
 			UpdateBattery(null, null);
 
 			// Timer.
@@ -134,18 +133,26 @@ namespace BatteryBud
 		private void InitContextMenu()
 		{
 			// Reminder.
-			int[] reminderPercents = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75};
-			var reminderItems = new MenuItem[reminderPercents.Length];
-			for(var i = 0; i < reminderItems.Length; i += 1)
+			int[] reminderPercentValues = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75};
+			_reminderPercentItems = new MenuItem[reminderPercentValues.Length];
+			for(var i = 0; i < _reminderPercentItems.Length; i += 1)
 			{
-				reminderItems[i] = new MenuItem(reminderPercents[i] + "%");
+				var iInv = _reminderPercentItems.Length - i - 1;
+				_reminderPercentItems[i] = new MenuItem(reminderPercentValues[iInv] + "%", ReminderChangeTriggerValue);
+				if (_reminderTriggerValue == reminderPercentValues[iInv])
+				{
+					_reminderPercentItems[i].Checked = true;
+				}
 			}
 			
+			_reminderDisableUntilChargingItem = new MenuItem("Disable until next charging", DisableReminderUntilChargingToggle);
+
 			var reminderMenu = new MenuItem[]
 			{
 				new MenuItem("Enable", ReminderToggle),
 				new MenuItem("Disable until shutdown", DisableReminderUntilShutdownToggle),
-				new MenuItem("Ring when battery is lower than", reminderItems),
+				_reminderDisableUntilChargingItem,
+				new MenuItem("Ring when battery is lower than", _reminderPercentItems),
 				new MenuItem("OwO what's this?", ShowReminderHelp),
 			};
 			reminderMenu[0].Checked = _reminderEnabled;
@@ -196,6 +203,9 @@ namespace BatteryBud
 			}
 			else
 			{
+				_reminderDisabledUntilCharging = false;
+				_reminderDisableUntilChargingItem.Checked = false;
+
 				if (_pow.PowerLineStatus != 0)
 				{
 					_trayIcon.Text = "Charging.";
@@ -227,6 +237,7 @@ namespace BatteryBud
 			// Playing reminder sound.
 			if (_reminderEnabled
 				&& !_reminderDisabledUntilShutdown
+				&& !_reminderDisabledUntilCharging
 				&& _percentageCurrent <= _reminderTriggerValue 
 				&& _pow.PowerLineStatus == 0
 			)
@@ -499,47 +510,63 @@ namespace BatteryBud
 			item.Checked = !item.Checked;
 		}
 
+		private void DisableReminderUntilChargingToggle(object sender, EventArgs e)
+		{
+			var item = ((MenuItem)sender);
+			
+			_reminderDisabledUntilCharging = !item.Checked;
+			item.Checked = !item.Checked;
+		}
 
+
+		private void ReminderChangeTriggerValue(object sender, EventArgs e)
+		{
+			foreach(MenuItem item in _reminderPercentItems)
+			{
+				item.Checked = false;
+			}
+
+			var currentItem = ((MenuItem)sender);
+			currentItem.Checked = true;
+
+			_reminderTriggerValue = Int32.Parse(currentItem.Text.Replace("%", ""));
+
+			Save();
+		}
 
 		#endregion Reminder.
 
 
 
-		#region Saves handling.
+		#region Saving/Loading.
 
 		//TODO: Add reminder data handling, migrate to JSON.
 
 		private void Load()
-		{
-			var lines = File.ReadAllLines(_saveFileName);
-			try
-			{
-				_autostartEnabled = (lines[0][0] == '1');
-				_skinName = lines[1];
-			}
-			catch(IndexOutOfRangeException) //Support for older save files.
-			{
-				_autostartEnabled = true;
-				_skinName = GetDefaultSkin();
-				Save();
-			}
+		{ 
+			var jsonText = File.ReadAllText(_saveFileName);
+			var json = JObject.Parse(jsonText); 					
+			_autostartEnabled = json.Value<bool>("autostartEnabled");
+			_skinName = json.Value<string>("skinName");
+			_reminderEnabled = json.Value<bool>("reminderEnabled");
+			_reminderTriggerValue = json.Value<int>("reminderTriggerValue");
 		}
 
 
 
 		private void Save()
 		{
-			var autostartChar = '0';
-			if (_autostartEnabled)
-			{
-				autostartChar = '1';
-			}
-			
-			string buf = autostartChar + Environment.NewLine + _skinName;
-			File.WriteAllText(_saveFileName, buf, System.Text.Encoding.UTF8);
+			var json = new JObject();
+
+			json.Add("autostartEnabled", new JValue(_autostartEnabled));
+			json.Add("skinName", new JValue(_skinName));
+			json.Add("reminderEnabled", new JValue(_reminderEnabled));
+			json.Add("reminderTriggerValue", new JValue(_reminderTriggerValue));
+
+			File.WriteAllText(_saveFileName, json.ToString());
 		}
 
-		#endregion Saves handling.
+		#endregion Saving/Loading.
 
 
 
