@@ -693,9 +693,9 @@ namespace BatteryBud
 		private static void ShowAbout(object sender, EventArgs e)
 		{
 			MessageBox.Show(
-				"Battery Bud v" + Program.Version + " by gn.fur." + Environment.NewLine + 
-				"Thanks to Konstantin Luzgin and Hans Passant." + 
-				"\nContact: foxoftgames@gmail.com", 
+				"Battery Bud v" + Program.Version + " Copyright (C) 2018 gn.fur." + Environment.NewLine + 
+				"Thanks to Konstantin Luzgin, Hans Passant and freesound.org." + 
+				"\nContact: foxoftgames@gmail.com",  
 				
 				"About"
 			);
