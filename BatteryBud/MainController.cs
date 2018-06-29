@@ -86,6 +86,7 @@ namespace BatteryBud
 			catch(FileNotFoundException) // Happens when some idiot deletes save file.
 			{
 				SetAutostart(null, null);
+				_skinName = GetDefaultSkin();
 			}
 			catch(DirectoryNotFoundException) // Happens on first launch. 
 			{
@@ -115,7 +116,7 @@ namespace BatteryBud
 			InitContextMenu();
 
 
-			_waveStream = new WaveFileReader(Environment.CurrentDirectory + "\\" + _resourceDir + "low_battery.wav");
+			_waveStream = new WaveFileReader(AppDomain.CurrentDomain.BaseDirectory + "\\" + _resourceDir + "low_battery.wav");
 			_soundPlayer = new WaveOutEvent();
 			_soundPlayer.Init(_waveStream);
 			
