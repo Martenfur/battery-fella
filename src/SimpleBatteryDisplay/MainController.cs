@@ -15,8 +15,6 @@ namespace SimpleBatteryDisplay
 
 		readonly PowerStatus _pow = SystemInformation.PowerStatus;
 
-		readonly string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-			"\\Battery Bud\\config.json";
 		readonly string _resourceDir = "Resources\\";
 		readonly string _registryPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 
@@ -28,14 +26,6 @@ namespace SimpleBatteryDisplay
 
 		int _percentagePrev = -1;
 		int _percentageCurrent = -1;
-
-		private AppSettings _settings = new AppSettings
-		{
-			AutostartEnabled = true,
-			SkinName = "default",
-			ReminderEnabled = true,
-			ReminderTriggerValue = 5
-		};
 
 		WaveStream _waveStream;
 		WaveOutEvent _soundPlayer;
@@ -57,22 +47,14 @@ namespace SimpleBatteryDisplay
 		/// </summary>
 		public MainController()
 		{
-			if (_pow.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
-			{
-				// If a user tries to run program from computer with no battery to track... this is stupid. And sad.
-				ShowError("You're trying to run Battery Bud from desktop PC. What were you thinking? :|", "wut");
-				//Application.ExitThread();
-				//Environment.Exit(1);
-			}
-
 			_trayIcon.Visible = true;
 
 			// Loading save info.
 			try
 			{
-				Load();
+				AppSettingsManager.Load();
 
-				if (_settings.AutostartEnabled)
+				if (AppSettingsManager.Settings.AutostartEnabled)
 				{
 					SetAutostart(null, null);
 				}
@@ -81,33 +63,33 @@ namespace SimpleBatteryDisplay
 					ResetAutostart(null, null);
 				}
 			}
-			catch (FileNotFoundException) // Happens when some idiot deletes save file.
+			catch (FileNotFoundException) // Happens when some idiot deletes the save file.
 			{
 				SetAutostart(null, null);
-				_settings.SkinName = GetDefaultSkin();
+				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
 			}
 			catch (DirectoryNotFoundException) // Happens on first launch. 
 			{
-				_settings.SkinName = GetDefaultSkin();
+				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
 				Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Battery Bud");
 				SetAutostart(null, null);
 				ShowGreeting();
 			}
 			// Loading save info.
 
-			if (!InitSkin(_settings.SkinName, true)) // If something failed, abort.
+			if (!InitSkin(AppSettingsManager.Settings.SkinName, true)) // If something fails, abort.
 			{
-				_settings.SkinName = GetDefaultSkin();
+				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
 				ShowError("Failed to load custom skin. Resetting to default and trying again.", ":c");
 
-				if (!InitSkin(_settings.SkinName, false))
+				if (!InitSkin(AppSettingsManager.Settings.SkinName, false))
 				{
 					Application.ExitThread();
 					Environment.Exit(1);
 				}
 				else
 				{
-					Save();
+					AppSettingsManager.Save();
 				}
 			}
 
@@ -139,7 +121,7 @@ namespace SimpleBatteryDisplay
 				var iInv = _reminderPercentItems.Length - i - 1;
 				_reminderPercentItems[i] = new ToolStripMenuItem(reminderPercentValues[iInv] + "%");
 				_reminderPercentItems[i].Click += ReminderChangeTriggerValue;
-				if (_settings.ReminderTriggerValue == reminderPercentValues[iInv])
+				if (AppSettingsManager.Settings.ReminderTriggerValue == reminderPercentValues[iInv])
 				{
 					_reminderPercentItems[i].Checked = true;
 				}
@@ -154,9 +136,9 @@ namespace SimpleBatteryDisplay
 				new ToolStripMenuItem("Disable until shutdown", null, DisableReminderUntilShutdownToggle),
 				_reminderDisableUntilChargingItem,
 				new ToolStripMenuItem("Ring when battery is lower than", null, _reminderPercentItems),
-				new ToolStripMenuItem("OwO what's this?", null, ShowReminderHelp),
+				new ToolStripMenuItem("Help", null, ShowReminderHelp),
 			};
-			reminderMenu[0].Checked = _settings.ReminderEnabled;
+			reminderMenu[0].Checked = AppSettingsManager.Settings.ReminderEnabled;
 			// Reminder.
 
 
@@ -166,7 +148,7 @@ namespace SimpleBatteryDisplay
 			_skinContextMenu = GetSkinList();
 			foreach (ToolStripMenuItem item in _skinContextMenu)
 			{
-				item.Checked = (item.Text == _settings.SkinName);
+				item.Checked = (item.Text == AppSettingsManager.Settings.SkinName);
 			}
 
 			_trayIcon.ContextMenuStrip = new ContextMenuStrip();
@@ -183,7 +165,7 @@ namespace SimpleBatteryDisplay
 
 
 
-			_itemAdd.Checked = _settings.AutostartEnabled;
+			_itemAdd.Checked = AppSettingsManager.Settings.AutostartEnabled;
 			_itemRemove.Checked = !_itemAdd.Checked;
 		}
 
@@ -237,10 +219,10 @@ namespace SimpleBatteryDisplay
 			_percentagePrev = _percentageCurrent;
 
 			// Playing reminder sound.
-			if (_settings.ReminderEnabled
+			if (AppSettingsManager.Settings.ReminderEnabled
 				&& !_reminderDisabledUntilShutdown
 				&& !_reminderDisabledUntilCharging
-				&& _percentageCurrent <= _settings.ReminderTriggerValue
+				&& _percentageCurrent <= AppSettingsManager.Settings.ReminderTriggerValue
 				&& _pow.PowerLineStatus == 0
 			)
 			{
@@ -269,11 +251,9 @@ namespace SimpleBatteryDisplay
 		#region Autostart.
 
 		/// <summary>
-		/// Checks registry. If there's no autostart key or it's defferent, sets it to proper value.
+		/// Checks registry. If there's no autostart key or it's different, sets it to proper value.
 		/// Also writes 1 to savefile.
 		/// </summary>
-		/// <param name="sender">Sender of the event</param>
-		/// <param name="args">Event arguments</param>
 		private void SetAutostart(object sender, EventArgs args)
 		{
 			if (_itemAdd != null && _itemRemove != null)
@@ -282,24 +262,10 @@ namespace SimpleBatteryDisplay
 				_itemRemove.Checked = false;
 			}
 
-			RegistryKey regKey = Registry.CurrentUser.OpenSubKey(_registryPath, true);
-			if (regKey != null)
-			{
-				var regVal = (string)regKey.GetValue("BatteryBud");
+			AutostartManager.SetAutostart();
 
-				if (regVal == null || !Application.ExecutablePath.Equals(regVal, StringComparison.OrdinalIgnoreCase))
-				{
-					try
-					{
-						regKey.SetValue("BatteryBud", Application.ExecutablePath);
-					}
-					catch (Exception) { }
-				}
-				regKey.Close();
-			}
-
-			_settings.AutostartEnabled = true;
-			Save();
+			AppSettingsManager.Settings.AutostartEnabled = true;
+			AppSettingsManager.Save();
 		}
 
 
@@ -317,23 +283,10 @@ namespace SimpleBatteryDisplay
 				_itemRemove.Checked = true;
 			}
 
-			RegistryKey regKey = Registry.CurrentUser.OpenSubKey(_registryPath, true);
+			AutostartManager.ResetAutostart();
 
-			if (regKey != null)
-			{
-				if (regKey.GetValue("BatteryBud") != null)
-				{
-					try
-					{
-						regKey.DeleteValue("BatteryBud");
-					}
-					catch (Exception) { }
-				}
-				regKey.Close();
-			}
-
-			_settings.AutostartEnabled = false;
-			Save();
+			AppSettingsManager.Settings.AutostartEnabled = false;
+			AppSettingsManager.Save();
 		}
 
 		#endregion Autostart.
@@ -471,11 +424,11 @@ namespace SimpleBatteryDisplay
 
 			if (InitSkin(skinNameBuf, false))
 			{
-				_settings.SkinName = skinNameBuf;
+				AppSettingsManager.Settings.SkinName = skinNameBuf;
 
 				_percentagePrev = -1;
 				UpdateBattery(null, null);
-				Save();
+				AppSettingsManager.Save();
 
 				foreach (ToolStripMenuItem item in _skinContextMenu)
 				{
@@ -496,10 +449,10 @@ namespace SimpleBatteryDisplay
 		{
 			var item = ((ToolStripMenuItem)sender);
 
-			_settings.ReminderEnabled = !item.Checked;
+			AppSettingsManager.Settings.ReminderEnabled = !item.Checked;
 			item.Checked = !item.Checked;
 
-			Save();
+			AppSettingsManager.Save();
 		}
 
 
@@ -531,53 +484,12 @@ namespace SimpleBatteryDisplay
 			var currentItem = ((ToolStripMenuItem)sender);
 			currentItem.Checked = true;
 
-			_settings.ReminderTriggerValue = Int32.Parse(currentItem.Text.Replace("%", ""));
+			AppSettingsManager.Settings.ReminderTriggerValue = Int32.Parse(currentItem.Text.Replace("%", ""));
 
-			Save();
+			AppSettingsManager.Save();
 		}
 
 		#endregion Reminder.
-
-
-
-		#region Saving/Loading.
-
-		//TODO: Add reminder data handling, migrate to JSON.
-		private void Load()
-		{
-			if (!File.Exists(_saveFileName))
-			{ 
-				return;
-			}
-
-			var jsonText = File.ReadAllText(_saveFileName);
-			var settings = JsonSerializer.Deserialize<AppSettings>(jsonText);
-
-			if (settings != null)
-			{
-				_settings.AutostartEnabled = settings.AutostartEnabled;
-				_settings.SkinName = settings.SkinName;
-				_settings.ReminderEnabled = settings.ReminderEnabled;
-				_settings.ReminderTriggerValue = settings.ReminderTriggerValue;
-			}
-		}
-
-		private void Save()
-		{
-			var settings = new AppSettings
-			{
-				AutostartEnabled = _settings.AutostartEnabled,
-				SkinName = _settings.SkinName,
-				ReminderEnabled = _settings.ReminderEnabled,
-				ReminderTriggerValue = _settings.ReminderTriggerValue
-			};
-
-			var options = new JsonSerializerOptions { WriteIndented = true };
-			var jsonText = JsonSerializer.Serialize(settings, options);
-			File.WriteAllText(_saveFileName, jsonText);
-		}
-
-		#endregion Saving/Loading.
 
 
 
@@ -681,44 +593,21 @@ namespace SimpleBatteryDisplay
 			MessageBox.Show(str, header, MessageBoxButtons.OK, MessageBoxIcon.Error);
 
 
-
 		public void ShowGreeting()
 		{
 			MessageBox.Show(
-				@"Thanks for choosing Battery Bud! \^0^/" + Environment.NewLine +
-				"Your default font is set to " + _settings.SkinName + "." + Environment.NewLine +
-				"If it looks blurry or has the same color as background," + Environment.NewLine +
-				"you can try out other fonts in context menu. You can also make your own fonts, if you want to.",
-
-				"Sup."
+				Strings.GreetingContent.Replace("{0}", AppSettingsManager.Settings.SkinName),
+				Strings.GreetingTitle
 			);
 		}
 
 
-
-		/// <summary>
-		/// About onClick handler.
-		/// </summary>
-		/// <param name="sender">Sender of the event</param>
-		/// <param name="e">Event arguments</param>
 		private static void ShowAbout(object sender, EventArgs e)
 		{
-			MessageBox.Show(
-				"Battery Bud v2.0 Copyright (C) 2025 minkberry." + Environment.NewLine +
-				"Thanks to Konstantin Luzgin, Hans Passant and freesound.org." +
-				"\nContact: https://thefoxsociety.net",
-
-				"About"
-			);
+			MessageBox.Show(Strings.AboutContent, Strings.AboutTitle);
 		}
 
 
-
-		/// <summary>
-		/// About onClick handler.
-		/// </summary>
-		/// <param name="sender">Sender of the event</param>
-		/// <param name="e">Event arguments</param>
 		private static void ShowReminderHelp(object sender, EventArgs e)
 		{
 			MessageBox.Show(
@@ -732,6 +621,5 @@ namespace SimpleBatteryDisplay
 		}
 
 		#endregion Messages.
-
 	}
 }

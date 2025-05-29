@@ -1,10 +1,8 @@
-using System.DirectoryServices.ActiveDirectory;
-
 namespace SimpleBatteryDisplay
 {
 	internal static class Program
 	{
-		public static string Version = "1.2";
+		public const string Version = "2.0";
 
 		[STAThread]
 		private static void Main()

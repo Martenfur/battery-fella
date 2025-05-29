@@ -1,0 +1,33 @@
+﻿using Microsoft.Win32;
+
+namespace SimpleBatteryDisplay
+{
+	public class AutostartManager
+	{
+		private const string _key = "sbd";
+
+		private static readonly string _appPath =
+			'"' + Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "sbd.exe") + '"';
+
+		public static bool IsAutostartSet => (string)GetKey().GetValue(_key) == _appPath;
+
+		public static void SetAutostart()
+		{
+			if (!IsAutostartSet)
+			{
+				GetKey().SetValue(_key, _appPath);
+			}
+		}
+
+		public static void ResetAutostart()
+		{
+			if (IsAutostartSet)
+			{
+				GetKey().DeleteValue(_key);
+			}
+		}
+
+		private static RegistryKey GetKey() =>
+			Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+	}
+}
