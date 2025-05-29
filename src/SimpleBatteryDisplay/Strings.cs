@@ -19,7 +19,8 @@ namespace SimpleBatteryDisplay
 			+ "\nContact: https://thefoxsociety.net";
 
 
-		public const string ReminderTitle = "";
-		public const string ReminderContent = "";
+		public const string ReminderTitle = "Oh no, I forgot to plug in my laptop! Again!";
+		public const string ReminderContent = AppName + " will ring an alarm if your battery gets below a certain percentage "
+			+ "so that you definitely remember to plug in your laptop and don't have it suddenly die on you.";
 	}
 }

@@ -11,25 +11,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Resources\default16.png">
+    <Content Include="res\default16.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\default24.png">
+    <Content Include="res\default24.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\default32.png">
+    <Content Include="res\default32.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\default_black16.png">
+    <Content Include="res\default_black16.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\default_black24.png">
+    <Content Include="res\default_black24.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\default_black32.png">
+    <Content Include="res\default_black32.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\low_battery.wav">
+    <Content Include="res\low_battery.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -1,7 +1,5 @@
-﻿using Microsoft.Win32;
-using NAudio.Wave;
+﻿using NAudio.Wave;
 using System.Drawing.Imaging;
-using System.Text.Json;
 using Timer = System.Windows.Forms.Timer;
 
 namespace SimpleBatteryDisplay
@@ -15,8 +13,7 @@ namespace SimpleBatteryDisplay
 
 		readonly PowerStatus _pow = SystemInformation.PowerStatus;
 
-		readonly string _resourceDir = "Resources\\";
-		readonly string _registryPath = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+		readonly string _resourceDir = "res/";
 
 		readonly Timer _timer = new Timer();
 
@@ -106,7 +103,6 @@ namespace SimpleBatteryDisplay
 			_timer.Interval = _updateInterval;
 			_timer.Tick += UpdateBattery;
 			_timer.Enabled = true;
-
 		}
 
 
@@ -360,7 +356,7 @@ namespace SimpleBatteryDisplay
 			{
 				if (!silent)
 				{
-					ShowError("Image is too small to be a font.", ":c");
+					ShowError("The image is too small to be a font.", ":c");
 				}
 				return false;
 			}
@@ -610,14 +606,7 @@ namespace SimpleBatteryDisplay
 
 		private static void ShowReminderHelp(object sender, EventArgs e)
 		{
-			MessageBox.Show(
-				"You know, it happens sometimes. Windows tells your battery is almost dead, " +
-				"you click OK and continue to watch that important video, until the laptop " +
-				"suddenly shuts down. But fear not! Now Battery Bud will ring the alarm when " +
-				"battery will be lower than certain percentage.",
-
-				"Oh no, I forgot to plug in my laptop! Again!"
-			);
+			MessageBox.Show(Strings.ReminderContent, Strings.ReminderTitle);
 		}
 
 		#endregion Messages.
