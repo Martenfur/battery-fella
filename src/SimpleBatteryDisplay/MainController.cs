@@ -93,7 +93,12 @@ namespace SimpleBatteryDisplay
 			InitContextMenu();
 
 
-			_waveStream = new WaveFileReader(AppDomain.CurrentDomain.BaseDirectory + "\\" + _resourceDir + "low_battery.wav");
+			_waveStream = new WaveFileReader(
+				Path.Combine(
+				Environment.CurrentDirectory, 
+				_resourceDir, 
+				"low_battery.wav")
+			);
 			_soundPlayer = new WaveOutEvent();
 			_soundPlayer.Init(_waveStream);
 
@@ -123,7 +128,7 @@ namespace SimpleBatteryDisplay
 				}
 			}
 
-			_reminderDisableUntilChargingItem = new ToolStripMenuItem("Disable until next charging");
+			_reminderDisableUntilChargingItem = new ToolStripMenuItem("Disable until plugged in");
 			_reminderDisableUntilChargingItem.Click += DisableReminderUntilChargingToggle;
 
 			var reminderMenu = new ToolStripMenuItem[]
@@ -155,7 +160,7 @@ namespace SimpleBatteryDisplay
 					new ToolStripMenuItem("Autostart", null, new []{_itemAdd, _itemRemove}),
 					new ToolStripMenuItem("Skins", null, _skinContextMenu),
 					new ToolStripMenuItem("Reminder", null, reminderMenu),
-					new ToolStripMenuItem("Close", null, Close)
+					new ToolStripMenuItem("Quit", null, Close)
 				}
 			);
 
@@ -301,7 +306,13 @@ namespace SimpleBatteryDisplay
 		{
 			try
 			{
-				_digits = Image.FromFile(AppDomain.CurrentDomain.BaseDirectory + _resourceDir + fontName + ".png");
+				_digits = Image.FromFile(
+					Path.Combine(
+						AppDomain.CurrentDomain.BaseDirectory,
+						_resourceDir,
+						fontName + ".png"
+					)
+				);
 			}
 			catch (FileNotFoundException)
 			{
