@@ -4,8 +4,13 @@ namespace SimpleBatteryDisplay
 {
 	public static class AppSettingsManager
 	{
-		private readonly static string _saveFileName = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) +
-			"/Battery Bud/config.json";
+		public static string ConfigDirectory => 
+			Path.Combine(
+				Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+				Strings.TechincalAppName
+			);
+
+		private static string ConfigPath => Path.Combine(ConfigDirectory, "config.json");
 
 
 		public static AppSettings Settings = new AppSettings
@@ -18,12 +23,12 @@ namespace SimpleBatteryDisplay
 
 		public static void Load()
 		{
-			if (!File.Exists(_saveFileName))
+			if (!File.Exists(ConfigPath))
 			{
 				return;
 			}
 
-			var jsonText = File.ReadAllText(_saveFileName);
+			var jsonText = File.ReadAllText(ConfigPath);
 			var settings = JsonSerializer.Deserialize<AppSettings>(jsonText);
 
 			if (settings != null)
@@ -47,7 +52,7 @@ namespace SimpleBatteryDisplay
 
 			var options = new JsonSerializerOptions { WriteIndented = true };
 			var jsonText = JsonSerializer.Serialize(settings, options);
-			File.WriteAllText(_saveFileName, jsonText);
+			File.WriteAllText(ConfigPath, jsonText);
 		}
 	}
 }

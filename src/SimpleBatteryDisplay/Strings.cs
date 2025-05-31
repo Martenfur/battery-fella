@@ -3,6 +3,7 @@ namespace SimpleBatteryDisplay
 {
 	public static class Strings
 	{
+		public const string TechincalAppName = "sbd";
 		public const string AppName = "Simple Battery Display";
 
 

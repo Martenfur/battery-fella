@@ -68,7 +68,7 @@ namespace SimpleBatteryDisplay
 			catch (DirectoryNotFoundException) // Happens on first launch. 
 			{
 				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
-				Directory.CreateDirectory(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\Battery Bud");
+				Directory.CreateDirectory(AppSettingsManager.ConfigDirectory);
 				SetAutostart(null, null);
 				ShowGreeting();
 			}
