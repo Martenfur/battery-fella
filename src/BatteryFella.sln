@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36109.1 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleBatteryDisplay", "SimpleBatteryDisplay\SimpleBatteryDisplay.csproj", "{06C79A88-232E-4E0E-9541-047482D8EA25}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BatteryFella", "BatteryFella\BatteryFella.csproj", "{06C79A88-232E-4E0E-9541-047482D8EA25}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

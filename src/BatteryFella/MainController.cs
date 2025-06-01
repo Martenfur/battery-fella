@@ -2,7 +2,7 @@
 using System.Drawing.Imaging;
 using Timer = System.Windows.Forms.Timer;
 
-namespace SimpleBatteryDisplay
+namespace BatteryFella
 {
 	public class MainController : ApplicationContext
 	{

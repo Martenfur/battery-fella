@@ -6,13 +6,13 @@
     <Nullable>disable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-	<TargetName>sbd</TargetName>
-	<AssemblyName>sbd</AssemblyName>
+	<TargetName>batteryfella</TargetName>
+	<AssemblyName>batteryfella</AssemblyName>
 	<ApplicationIcon>logo.ico</ApplicationIcon>
 	<SignAssembly>False</SignAssembly>
 	<Authors>the fox society</Authors>
 	<Version>2.0.0</Version>
-	<Product>Simple Battery Display</Product>
+	<Product>Battery Fella</Product>
 	<Description>A utility to display battery percentage in the system tray.</Description>
   </PropertyGroup>
 

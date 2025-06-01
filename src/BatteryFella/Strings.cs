@@ -1,22 +1,22 @@
 ﻿
-namespace SimpleBatteryDisplay
+namespace BatteryFella
 {
 	public static class Strings
 	{
-		public const string TechincalAppName = "sbd";
-		public const string AppName = "Simple Battery Display";
+		public const string TechincalAppName = "batteryfella";
+		public const string AppName = "Battery Fella";
 
 
 		public const string GreetingTitle = "Hi!";
-		public const string GreetingContent = @"Thanks for choosing Battery Bud!"
+		public const string GreetingContent = @"Thanks for choosing " + AppName + "!"
 				+ "\nYour default font is set to {0}."
-				+ "\nIf it looks blurry or has the same color as background,"
-				+ "\nyou can try out other fonts in context menu. You can also make your own fonts, if you want to.";
+				+ "\nIf it looks blurry or has the same color as the background,"
+				+ "\nyou can try out other fonts in the context menu.";
 
 
 		public const string AboutTitle = "About";
 		public const string AboutContent = AppName + " " + Program.Version + " Copyright (C) 2025 minkberry." 
-			+ "\nThanks to Konstantin Luzgin, Hans Passant and freesound.org."
+			+ "\nSpecial thanks to Konstantin Luzgin, Hans Passant and freesound.org."
 			+ "\nContact: https://thefoxsociety.net";
 
 

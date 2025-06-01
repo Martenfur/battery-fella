@@ -1,13 +1,13 @@
 ﻿using Microsoft.Win32;
 
-namespace SimpleBatteryDisplay
+namespace BatteryFella
 {
 	public class AutostartManager
 	{
-		private const string _key = "sbd";
+		private const string _key = Strings.TechincalAppName;
 
 		private static readonly string _appPath =
-			'"' + Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, "sbd.exe") + '"';
+			'"' + Path.Combine(System.AppDomain.CurrentDomain.BaseDirectory, Strings.TechincalAppName + ".exe") + '"';
 
 		public static bool IsAutostartSet => (string)GetKey().GetValue(_key) == _appPath;
 

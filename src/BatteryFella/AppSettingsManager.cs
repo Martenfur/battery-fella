@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace SimpleBatteryDisplay
+namespace BatteryFella
 {
 	public static class AppSettingsManager
 	{

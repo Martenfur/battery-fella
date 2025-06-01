@@ -1,4 +1,4 @@
-﻿namespace SimpleBatteryDisplay
+﻿namespace BatteryFella
 {
 	public class AppSettings
 	{

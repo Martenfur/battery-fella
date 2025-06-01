@@ -1,4 +1,4 @@
-namespace SimpleBatteryDisplay
+namespace BatteryFella
 {
 	internal static class Program
 	{
@@ -7,7 +7,6 @@ namespace SimpleBatteryDisplay
 		[STAThread]
 		private static void Main()
 		{
-			// ReSharper disable once UnusedVariable
 			if (Environment.OSVersion.Version.Major >= 6) // Makes context menus look fabulous on any DPI.
 			{
 				SetProcessDPIAware();
