@@ -12,4 +12,4 @@ This utility adds a system tray battery percentage indicator on Windows.
   your battery drops below a certain percentage.
 - **Custom fonts** - if you don't like the default look, you can design your own font.
 
-![pic](https://file+.vscode-resource.vscode-cdn.net/c%3A/me/repos/battery-fella/assets/style.png)
+![pic](assets/style.png)
