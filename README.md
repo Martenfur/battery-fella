@@ -1,5 +1,7 @@
 # Simple Battery Display
 
+![logo](assets/logo.png)
+
 This utility adds a battery percentage indicator to the taskbar that is visible at all times.
 
 ## Features
