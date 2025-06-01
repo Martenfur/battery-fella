@@ -6,108 +6,114 @@ namespace SimpleBatteryDisplay
 {
 	public class MainController : ApplicationContext
 	{
-		const int _updateInterval = 1000; //ms
+		private const int _updateInterval = 1000; //ms
 
-		int[] _digitSep = new int[10];
-
-
-		readonly PowerStatus _pow = SystemInformation.PowerStatus;
-
-		readonly string _resourceDir = "res/";
-
-		readonly Timer _timer = new Timer();
-
-		readonly NotifyIcon _trayIcon = new NotifyIcon();
-		Image _digits;
-		int _digitWidth;
-
-		int _percentagePrev = -1;
-		int _percentageCurrent = -1;
-
-		WaveStream _waveStream;
-		WaveOutEvent _soundPlayer;
-
-		bool _reminderDisabledUntilShutdown = false;
-		bool _reminderDisabledUntilCharging = false;
-		ToolStripMenuItem[] _reminderPercentItems;
-
-		ToolStripMenuItem _reminderDisableUntilChargingItem;
-
-		ToolStripMenuItem[] _skinContextMenu;
-		ToolStripMenuItem _itemAdd;
-		ToolStripMenuItem _itemRemove;
+		private int[] _digitSep = new int[10];
 
 
+		private readonly PowerStatus _pow = SystemInformation.PowerStatus;
+
+		// Note that we cannot use CurrentDirectory here as it'll be pointing to system32
+		// when the program autostarts.
+		private string _resourceDir => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "res");
+
+		private readonly Timer _timer = new Timer();
+
+		private readonly NotifyIcon _trayIcon = new NotifyIcon();
+		private Image _digits;
+		private int _digitWidth;
+
+		private int _percentagePrev = -1;
+		private int _percentageCurrent = -1;
+
+		private WaveStream _waveStream;
+		private WaveOutEvent _soundPlayer;
+
+		private bool _reminderDisabledUntilShutdown = false;
+		private bool _reminderDisabledUntilCharging = false;
+		private ToolStripMenuItem[] _reminderPercentItems;
+
+		private ToolStripMenuItem _reminderDisableUntilChargingItem;
+
+		private ToolStripMenuItem[] _skinContextMenu;
+
+		private ToolStripMenuItem _autostartItem;
 
 		/// <summary>
 		/// Initializing stuff.
 		/// </summary>
 		public MainController()
 		{
-			_trayIcon.Visible = true;
-
-			// Loading save info.
 			try
 			{
-				AppSettingsManager.Load();
+				_trayIcon.Visible = true;
 
-				if (AppSettingsManager.Settings.AutostartEnabled)
+				// Loading save info.
+				try
+				{
+					AppSettingsManager.Load();
+
+					if (AppSettingsManager.Settings.AutostartEnabled)
+					{
+						SetAutostart(null, null);
+					}
+					else
+					{
+						ResetAutostart(null, null);
+					}
+				}
+				catch (FileNotFoundException) // Happens when some idiot deletes the save file.
 				{
 					SetAutostart(null, null);
+					AppSettingsManager.Settings.SkinName = GetDefaultSkin();
 				}
-				else
+				catch (DirectoryNotFoundException) // Happens on first launch. 
 				{
-					ResetAutostart(null, null);
+					AppSettingsManager.Settings.SkinName = GetDefaultSkin();
+					Directory.CreateDirectory(AppSettingsManager.ConfigDirectory);
+					SetAutostart(null, null);
+					ShowGreeting();
 				}
-			}
-			catch (FileNotFoundException) // Happens when some idiot deletes the save file.
-			{
-				SetAutostart(null, null);
-				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
-			}
-			catch (DirectoryNotFoundException) // Happens on first launch. 
-			{
-				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
-				Directory.CreateDirectory(AppSettingsManager.ConfigDirectory);
-				SetAutostart(null, null);
-				ShowGreeting();
-			}
-			// Loading save info.
+				// Loading save info.
 
-			if (!InitSkin(AppSettingsManager.Settings.SkinName, true)) // If something fails, abort.
-			{
-				AppSettingsManager.Settings.SkinName = GetDefaultSkin();
-				ShowError("Failed to load custom skin. Resetting to default and trying again.", ":c");
-
-				if (!InitSkin(AppSettingsManager.Settings.SkinName, false))
+				if (!InitSkin(AppSettingsManager.Settings.SkinName, true)) // If something fails, abort.
 				{
-					Application.ExitThread();
-					Environment.Exit(1);
+					AppSettingsManager.Settings.SkinName = GetDefaultSkin();
+					ShowError("Failed to load custom skin. Resetting to default and trying again.", ":c");
+
+					if (!InitSkin(AppSettingsManager.Settings.SkinName, false))
+					{
+						Application.ExitThread();
+						Environment.Exit(1);
+					}
+					else
+					{
+						AppSettingsManager.Save();
+					}
 				}
-				else
-				{
-					AppSettingsManager.Save();
-				}
+
+				InitContextMenu();
+
+
+				_waveStream = new WaveFileReader(
+					Path.Combine(_resourceDir, "low_battery.wav")
+				);
+				_soundPlayer = new WaveOutEvent();
+				_soundPlayer.Init(_waveStream);
+
+				UpdateBattery(null, null);
+
+				// Timer.
+				_timer.Interval = _updateInterval;
+				_timer.Tick += UpdateBattery;
+				_timer.Enabled = true;
 			}
-
-			InitContextMenu();
-
-
-			_waveStream = new WaveFileReader(
-				Path.Combine(
-				Environment.CurrentDirectory, 
-				_resourceDir, 
-				"low_battery.wav")
-			);
-			_soundPlayer = new WaveOutEvent();
-			_soundPlayer.Init(_waveStream);
-
-			UpdateBattery(null, null);
-
-			// Timer.
-			_timer.Interval = _updateInterval;
-			_timer.Tick += UpdateBattery;
-			_timer.Enabled = true;
+			catch (Exception e)
+			{
+				ShowError(e.Message + "\n" + e.StackTrace, ":c");
+				Application.ExitThread();
+				Application.Exit();
+			}
 		}
 
 
@@ -136,15 +142,11 @@ namespace SimpleBatteryDisplay
 				new ToolStripMenuItem("Enable", null, ReminderToggle),
 				new ToolStripMenuItem("Disable until shutdown", null, DisableReminderUntilShutdownToggle),
 				_reminderDisableUntilChargingItem,
-				new ToolStripMenuItem("Ring when battery is lower than", null, _reminderPercentItems),
+				new ToolStripMenuItem("Ring when the battery is lower than", null, _reminderPercentItems),
 				new ToolStripMenuItem("Help", null, ShowReminderHelp),
 			};
 			reminderMenu[0].Checked = AppSettingsManager.Settings.ReminderEnabled;
 			// Reminder.
-
-
-			_itemAdd = new ToolStripMenuItem("Add to autostart", null, SetAutostart);
-			_itemRemove = new ToolStripMenuItem("Remove from autostart", null, ResetAutostart);
 
 			_skinContextMenu = GetSkinList();
 			foreach (ToolStripMenuItem item in _skinContextMenu)
@@ -152,22 +154,22 @@ namespace SimpleBatteryDisplay
 				item.Checked = (item.Text == AppSettingsManager.Settings.SkinName);
 			}
 
+			_autostartItem = new ToolStripMenuItem("Launch on startup", null, ToggleAutostart);
 			_trayIcon.ContextMenuStrip = new ContextMenuStrip();
+			// Fixes checkboxes being cut off.
+			_trayIcon.ContextMenuStrip.ShowCheckMargin = true;
+
 			_trayIcon.ContextMenuStrip.Items.AddRange(
 				new[]
 				{
 					new ToolStripMenuItem("About", null, ShowAbout),
-					new ToolStripMenuItem("Autostart", null, new []{_itemAdd, _itemRemove}),
+					_autostartItem,
 					new ToolStripMenuItem("Skins", null, _skinContextMenu),
 					new ToolStripMenuItem("Reminder", null, reminderMenu),
 					new ToolStripMenuItem("Quit", null, Close)
 				}
 			);
-
-
-
-			_itemAdd.Checked = AppSettingsManager.Settings.AutostartEnabled;
-			_itemRemove.Checked = !_itemAdd.Checked;
+			_autostartItem.Checked = AppSettingsManager.Settings.AutostartEnabled;
 		}
 
 
@@ -251,24 +253,35 @@ namespace SimpleBatteryDisplay
 
 		#region Autostart.
 
+		private void ToggleAutostart(object sender, EventArgs args)
+		{
+			if (AppSettingsManager.Settings.AutostartEnabled)
+			{
+				ResetAutostart(null, null);
+			}
+			else
+			{
+				SetAutostart(null, null);	
+			}
+
+			if (_autostartItem != null)
+			{
+				_autostartItem.Checked = AppSettingsManager.Settings.AutostartEnabled;
+			}
+		}
+
+
 		/// <summary>
 		/// Checks registry. If there's no autostart key or it's different, sets it to proper value.
 		/// Also writes 1 to savefile.
 		/// </summary>
 		private void SetAutostart(object sender, EventArgs args)
 		{
-			if (_itemAdd != null && _itemRemove != null)
-			{
-				_itemAdd.Checked = true;
-				_itemRemove.Checked = false;
-			}
-
 			AutostartManager.SetAutostart();
 
 			AppSettingsManager.Settings.AutostartEnabled = true;
 			AppSettingsManager.Save();
 		}
-
 
 
 		/// <summary>
@@ -278,12 +291,6 @@ namespace SimpleBatteryDisplay
 		/// <param name="args">Event arguments</param>
 		private void ResetAutostart(object sender, EventArgs args)
 		{
-			if (_itemAdd != null && _itemRemove != null)
-			{
-				_itemAdd.Checked = false;
-				_itemRemove.Checked = true;
-			}
-
 			AutostartManager.ResetAutostart();
 
 			AppSettingsManager.Settings.AutostartEnabled = false;
@@ -307,11 +314,7 @@ namespace SimpleBatteryDisplay
 			try
 			{
 				_digits = Image.FromFile(
-					Path.Combine(
-						AppDomain.CurrentDomain.BaseDirectory,
-						_resourceDir,
-						fontName + ".png"
-					)
+					Path.Combine(_resourceDir, fontName + ".png")
 				);
 			}
 			catch (FileNotFoundException)
@@ -387,7 +390,7 @@ namespace SimpleBatteryDisplay
 		{
 			var skinItems = new List<ToolStripMenuItem>();
 
-			var dirInfo = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory + _resourceDir);
+			var dirInfo = new DirectoryInfo(_resourceDir);
 			foreach (FileInfo file in dirInfo.GetFiles("*.png"))
 			{
 				skinItems.Add(new ToolStripMenuItem(Path.GetFileNameWithoutExtension(file.Name), null, SetSkin));
