@@ -1,5 +1,7 @@
 ﻿using NAudio.Wave;
+using System.Diagnostics;
 using System.Drawing.Imaging;
+using System.Security.Policy;
 using Timer = System.Windows.Forms.Timer;
 
 namespace BatteryFella
@@ -614,7 +616,12 @@ namespace BatteryFella
 
 		private static void ShowAbout(object sender, EventArgs e)
 		{
-			MessageBox.Show(Strings.AboutContent, Strings.AboutTitle);
+			var startInfo = new ProcessStartInfo()
+			{
+				FileName = Strings.RepositoryUrl,
+				UseShellExecute = true,
+			};
+			Process.Start(startInfo);
 		}
 
 
