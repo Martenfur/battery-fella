@@ -19,3 +19,11 @@ This utility adds a system tray battery percentage indicator on Windows.
 - **Low battery alarm** - If you keep forgetting to charge your battery, Simple Battery Display will remind you when
   your battery drops below a certain percentage.
 - **Custom fonts** - if you don't like the default look, you can design your own font.
+
+## About
+
+App by [minkberry](https://thefoxsociety.net).
+
+SFX by [Ne1gh](https://soundcloud.com/ne1gh).
+
+Special thanks to Konstantin Luzgin and Hans Passant.

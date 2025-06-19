@@ -16,7 +16,8 @@ namespace BatteryFella
 
 		public const string AboutTitle = "About";
 		public const string AboutContent = AppName + " " + Program.Version + " Copyright (C) 2025 minkberry." 
-			+ "\nSpecial thanks to Konstantin Luzgin, Hans Passant and freesound.org."
+			+ "\nSound effect by Ne1gh."
+			+ "\nSpecial thanks to Konstantin Luzgin and Hans Passant."
 			+ "\nContact: https://thefoxsociety.net";
 
 
