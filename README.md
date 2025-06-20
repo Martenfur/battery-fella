@@ -24,6 +24,6 @@ This utility adds a system tray battery percentage indicator on Windows.
 
 App by [minkberry](https://thefoxsociety.net).
 
-SFX by [Ne1gh](https://soundcloud.com/ne1gh).
+SFX by [Ne1gh](https://www.youtube.com/@Ne1gh_).
 
 Special thanks to Konstantin Luzgin and Hans Passant.
